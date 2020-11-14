@@ -5,16 +5,11 @@
 #include "esp_http_server.h"
 #include "camera_pins.h"
 #include "wifi_config.h"
-#define PART_BOUNDARY "123456789000000000000987654321"
-static
-const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary="
-PART_BOUNDARY;
-static
-const char *_STREAM_BOUNDARY = "\r\n--"
-PART_BOUNDARY "\r\n";
-static
-const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
+#define PART_BOUNDARY "123456789000000000000987654321"
+static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
+static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
+static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 httpd_handle_t stream_httpd = NULL;
 
 static esp_err_t stream_handler(httpd_req_t *req)
