@@ -184,6 +184,8 @@ void setup()
 
   sensor_t *s = esp_camera_sensor_get();
   s->set_vflip(s, 1); //flip vertically
+  s->set_hmirror(s, 1); //flip horizontally
+
 
   connectWiFi();
   startCameraServer();
