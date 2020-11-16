@@ -10,6 +10,7 @@
 
 #include "CameraServer.h"
 #include "WifiHelper.h"
+#include "ImageUtils.h"
 
 CameraServer camServer;
 
@@ -76,25 +77,37 @@ void initCNN()
 	Serial.println("Starting inferences... ! ");
 }
 
-void predict()
+int predict(const dl_matrix3du_t* frame, const int x, const int y)
 {
-    for (int i = 0; i < 28 * 28; i++)
-    {
-        input->data.f[i] = (float)rand() / RAND_MAX; // TODO: use actual camera image
-    }
+    ImageUtils::GetNormalizedPixels(frame, x, y, 28, 28, input->data.f);
 
     // Run inference on the input data
     if(interpreter->Invoke() != kTfLiteOk)
     {
         Serial.println("There was an error invoking the interpreter!");
-        return;
+        return -1;
     }
 
-    Serial.println();
+    float bestConv = 0.0;
+    int bestMatch = -1;
     for (int i = 0; i < 10; i++)
-    {
+    {        
         Serial.println(String(i) + " -> " + output->data.f[i] * 100);
+        if (output->data.f[i] > bestConv)
+        {
+            bestConv = output->data.f[i];
+            bestMatch = i;
+        }
     }
+    return bestMatch;
+}
+
+void DetectDigit(dl_matrix3du_t* frame, const int x, const int y)
+{
+    int digit = predict(frame, x, y);
+    Serial.println(String("PREDICTION: ") + digit);
+    ImageUtils::DrawRect(x, y, 28, 28, COLOR_RED, frame);
+    ImageUtils::DrawText(x + 5, y + 28, COLOR_RED, String(digit), frame);
 }
 
 void setup()
@@ -118,7 +131,10 @@ void setup()
 
 void loop()
 {
-    delay(1000);
-
-    predict();
+    auto* frame = camServer.CaptureFrame();    
+    if (frame != nullptr)
+    {
+        DetectDigit(frame, 146, 106);
+    }
+    delay(100);
 }

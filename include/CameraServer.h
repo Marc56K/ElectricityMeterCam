@@ -1,5 +1,7 @@
 #pragma once
 #include "esp_camera.h"
+#include "fb_gfx.h"
+#include "fr_forward.h"
 
 class CameraServer
 {
@@ -7,6 +9,7 @@ public:
     CameraServer();
     ~CameraServer();
 
-    bool InitCamera(const bool flipImage);
     bool StartServer();
+    bool InitCamera(const bool flipImage);
+    dl_matrix3du_t* CaptureFrame();
 };

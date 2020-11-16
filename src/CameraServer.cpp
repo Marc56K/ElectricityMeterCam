@@ -9,9 +9,10 @@ static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 httpd_handle_t stream_httpd = NULL;
 
+dl_matrix3du_t* rgb_buffer = nullptr;
+
 static esp_err_t stream_handler(httpd_req_t *req)
 {
-    camera_fb_t *fb = NULL;
     esp_err_t res = ESP_OK;
     size_t _jpg_buf_len = 0;
     uint8_t *_jpg_buf = NULL;
@@ -25,32 +26,25 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
-        fb = esp_camera_fb_get();
-        if (!fb)
+        if (rgb_buffer == nullptr)
         {
             Serial.println("Camera capture failed");
             res = ESP_FAIL;
         }
         else
         {
-            if (fb->width > 400)
+            bool jpeg_converted = fmt2jpg(
+            rgb_buffer->item, 
+            rgb_buffer->stride * rgb_buffer->h,
+            rgb_buffer->w,
+            rgb_buffer->h,
+            PIXFORMAT_RGB888,
+            80, &_jpg_buf, &_jpg_buf_len);
+            
+            if (!jpeg_converted)
             {
-                if (fb->format != PIXFORMAT_JPEG)
-                {
-                    bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-                    esp_camera_fb_return(fb);
-                    fb = NULL;
-                    if (!jpeg_converted)
-                    {
-                        Serial.println("JPEG compression failed");
-                        res = ESP_FAIL;
-                    }
-                }
-                else
-                {
-                    _jpg_buf_len = fb->len;
-                    _jpg_buf = fb->buf;
-                }
+                Serial.println("JPEG compression failed");
+                res = ESP_FAIL;
             }
         }
 
@@ -70,13 +64,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
         }
 
-        if (fb)
-        {
-            esp_camera_fb_return(fb);
-            fb = NULL;
-            _jpg_buf = NULL;
-        }
-        else if (_jpg_buf)
+        if (_jpg_buf)
         {
             free(_jpg_buf);
             _jpg_buf = NULL;
@@ -101,6 +89,26 @@ CameraServer::~CameraServer()
 {
 }
 
+bool CameraServer::StartServer()
+{
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.server_port = 80;
+
+    httpd_uri_t index_uri = {.uri = "/",
+                             .method = HTTP_GET,
+                             .handler = stream_handler,
+                             .user_ctx = NULL};
+
+    //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
+    if (httpd_start(&stream_httpd, &config) == ESP_OK)
+    {
+        httpd_register_uri_handler(stream_httpd, &index_uri);
+        return true;
+    }
+
+    return false;
+}
+
 bool CameraServer::InitCamera(const bool flipImage)
 {
     camera_config_t config;
@@ -123,8 +131,8 @@ bool CameraServer::InitCamera(const bool flipImage)
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;
-    config.pixel_format = PIXFORMAT_JPEG; //PIXFORMAT_GRAYSCALE;
-    config.frame_size = FRAMESIZE_VGA;
+    config.pixel_format = PIXFORMAT_JPEG;
+    config.frame_size = FRAMESIZE_QVGA;
     config.jpeg_quality = 12;
     config.fb_count = 1;
 
@@ -147,22 +155,29 @@ bool CameraServer::InitCamera(const bool flipImage)
     return true;
 }
 
-bool CameraServer::StartServer()
+dl_matrix3du_t* CameraServer::CaptureFrame()
 {
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.server_port = 80;
-
-    httpd_uri_t index_uri = {.uri = "/",
-                             .method = HTTP_GET,
-                             .handler = stream_handler,
-                             .user_ctx = NULL};
-
-    //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
-    if (httpd_start(&stream_httpd, &config) == ESP_OK)
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (fb == nullptr)
     {
-        httpd_register_uri_handler(stream_httpd, &index_uri);
-        return true;
+        Serial.println("Camera capture failed");
+        return nullptr;
     }
 
-    return false;
+    if (rgb_buffer == nullptr)
+    {
+        rgb_buffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
+        memset(rgb_buffer->item, 255, rgb_buffer->stride * rgb_buffer->h);
+    }
+
+    if (!fmt2rgb888(fb->buf, fb->len, fb->format, rgb_buffer->item))
+    {
+        Serial.println("fmt2rgb888 failed");
+    }
+
+    if (fb != nullptr)
+    {
+        esp_camera_fb_return(fb);
+    }
+    return rgb_buffer;
 }
