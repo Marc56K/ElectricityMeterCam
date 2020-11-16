@@ -14,7 +14,7 @@
 CameraServer camServer;
 
 // Create a memory pool for the nodes in the network
-constexpr int tensor_pool_size = 108160 + 2248;//100 * 1024;
+constexpr int tensor_pool_size = 64 * 1024;
 uint8_t* tensor_pool = nullptr;
 
 // Define the model to be used
@@ -80,7 +80,7 @@ void predict()
 {
     for (int i = 0; i < 28 * 28; i++)
     {
-        input->data.f[i] = (float)rand() / RAND_MAX;
+        input->data.f[i] = (float)rand() / RAND_MAX; // TODO: use actual camera image
     }
 
     // Run inference on the input data
@@ -105,7 +105,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("starting ...");
 
-    //initCNN();
+    initCNN();
 
     WifiHelper::Connect();
 
@@ -118,7 +118,7 @@ void setup()
 
 void loop()
 {
-    delay(1);
+    delay(1000);
 
-    //predict();
+    predict();
 }
