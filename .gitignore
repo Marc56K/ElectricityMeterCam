@@ -1,4 +1,9 @@
-﻿wifi_config.h
+﻿.pio
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch
+wifi_config.h
 JupyterNotebooks/images/digits
 JupyterNotebooks/images/*.jpg
 JupyterNotebooks/images/*.png
