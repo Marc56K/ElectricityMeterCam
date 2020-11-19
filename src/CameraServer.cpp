@@ -75,7 +75,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
             break;
         }
 
-        Serial.printf("MJPG: %uB\n", (uint32_t)(_jpg_buf_len));
+        //Serial.printf("MJPG: %uB\n", (uint32_t)(_jpg_buf_len));
     }
 
     return res;

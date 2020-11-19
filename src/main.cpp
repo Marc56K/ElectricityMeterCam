@@ -27,12 +27,13 @@ void setup()
     }
 }
 
-void DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height)
+int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height)
 {
     int digit = ocr.PredictDigit(frame, x, y, width, height);
-    Serial.println(String("PREDICTION: ") + digit);
+    //Serial.println(String("PREDICTION: ") + digit);
     ImageUtils::DrawRect(x, y, width, height, COLOR_RED, frame);
     ImageUtils::DrawText(x + width / 5, y + height, COLOR_RED, String(digit), frame);
+    return digit;
 }
 
 void loop()
@@ -42,10 +43,13 @@ void loop()
     {
         int left = 24;
         int stepSize = 40;
+        float result = 0;
         for (int i = 0; i < 7; i++)
         {
-            DetectDigit(frame, left + stepSize * i, 98, 32, 42);
+            int digit = DetectDigit(frame, left + stepSize * i, 98, 32, 42);
+            result += pow(10, 5 - i) * digit;
         }
+        Serial.println(String("VALUE: ") + result);
     }
     delay(100);
 }

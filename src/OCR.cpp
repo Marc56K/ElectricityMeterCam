@@ -60,6 +60,7 @@ OCR::~OCR()
 
 int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int rectY, const int rectWidth, const int rectHeight)
 {
+    auto start = millis();
     ImageUtils::GetNormalizedPixels(
         frame, 
         rectX,
@@ -69,6 +70,10 @@ int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int re
         _input->data.f,
         _inputWidth,
         _inputHeight);
+
+    auto end = millis();
+    Serial.println(String("Conversion: ") + (end - start) + "ms");
+    start = end;
 
     // Run inference on the input data
     if(_interpreter->Invoke() != kTfLiteOk)
@@ -88,5 +93,9 @@ int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int re
             bestMatch = i;
         }
     }
+    
+    end = millis();
+    Serial.println(String("Inference: ") + (end - start) + "ms");
+
     return bestMatch;
 }
