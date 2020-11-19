@@ -12,4 +12,8 @@ public:
     bool StartServer();
     bool InitCamera(const bool flipImage);
     dl_matrix3du_t* CaptureFrame();
+
+private:
+    dl_matrix3du_t* _frontRgbBuffer;
+    dl_matrix3du_t* _backRgbBuffer;
 };

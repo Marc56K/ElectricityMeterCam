@@ -9,7 +9,7 @@ static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 httpd_handle_t stream_httpd = NULL;
 
-dl_matrix3du_t* rgb_buffer = nullptr;
+dl_matrix3du_t* httpFrontBuffer = nullptr;
 
 static esp_err_t stream_handler(httpd_req_t *req)
 {
@@ -26,7 +26,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
-        if (rgb_buffer == nullptr)
+        if (httpFrontBuffer == nullptr)
         {
             Serial.println("Camera capture failed");
             res = ESP_FAIL;
@@ -34,10 +34,10 @@ static esp_err_t stream_handler(httpd_req_t *req)
         else
         {
             bool jpeg_converted = fmt2jpg(
-            rgb_buffer->item, 
-            rgb_buffer->stride * rgb_buffer->h,
-            rgb_buffer->w,
-            rgb_buffer->h,
+            httpFrontBuffer->item, 
+            httpFrontBuffer->stride * httpFrontBuffer->h,
+            httpFrontBuffer->w,
+            httpFrontBuffer->h,
             PIXFORMAT_RGB888,
             80, &_jpg_buf, &_jpg_buf_len);
             
@@ -81,12 +81,19 @@ static esp_err_t stream_handler(httpd_req_t *req)
     return res;
 }
 
-CameraServer::CameraServer()
+CameraServer::CameraServer() :
+    _frontRgbBuffer(nullptr),
+    _backRgbBuffer(nullptr)
 {
 }
 
 CameraServer::~CameraServer()
 {
+    if (_frontRgbBuffer != nullptr)
+        dl_matrix3du_free(_frontRgbBuffer);
+
+    if (_backRgbBuffer != nullptr)
+        dl_matrix3du_free(_backRgbBuffer);
 }
 
 bool CameraServer::StartServer()
@@ -164,13 +171,19 @@ dl_matrix3du_t* CameraServer::CaptureFrame()
         return nullptr;
     }
 
-    if (rgb_buffer == nullptr)
+    if (_backRgbBuffer == nullptr)
     {
-        rgb_buffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-        memset(rgb_buffer->item, 255, rgb_buffer->stride * rgb_buffer->h);
+        _frontRgbBuffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
+        memset(_frontRgbBuffer->item, 255, _frontRgbBuffer->stride * _frontRgbBuffer->h);
+
+        _backRgbBuffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
+        memset(_backRgbBuffer->item, 255, _backRgbBuffer->stride * _backRgbBuffer->h);
     }
 
-    if (!fmt2rgb888(fb->buf, fb->len, fb->format, rgb_buffer->item))
+    std::swap(_frontRgbBuffer, _backRgbBuffer);
+    httpFrontBuffer = _frontRgbBuffer;
+
+    if (!fmt2rgb888(fb->buf, fb->len, fb->format, _backRgbBuffer->item))
     {
         Serial.println("fmt2rgb888 failed");
     }
@@ -179,5 +192,6 @@ dl_matrix3du_t* CameraServer::CaptureFrame()
     {
         esp_camera_fb_return(fb);
     }
-    return rgb_buffer;
+
+    return _backRgbBuffer;
 }
