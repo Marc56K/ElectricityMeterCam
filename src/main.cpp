@@ -4,10 +4,10 @@
 
 #include "CameraServer.h"
 #include "WifiHelper.h"
-#include "ocr_model.h"
 #include "OCR.h"
 
-OCR ocr(ocr_model_tflite, 28, 28);
+//OCR ocr(ocr_model_22x32_tflite, 22, 32);
+OCR ocr(ocr_model_28x28_tflite, 28, 28);
 CameraServer camServer;
 
 void setup()
@@ -40,8 +40,12 @@ void loop()
     auto* frame = camServer.CaptureFrame();    
     if (frame != nullptr)
     {
-        DetectDigit(frame, 152, 106, 16, 28);
-        DetectDigit(frame, 180, 106, 16, 28);
+        int left = 24;
+        int stepSize = 40;
+        for (int i = 0; i < 7; i++)
+        {
+            DetectDigit(frame, left + stepSize * i, 98, 32, 42);
+        }
     }
     delay(100);
 }
