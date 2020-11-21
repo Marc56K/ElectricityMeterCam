@@ -7,8 +7,8 @@
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
-httpd_handle_t stream_httpd = NULL;
-
+httpd_handle_t indexHtmlHandler = nullptr;
+SemaphoreHandle_t bufferSemaphore = xSemaphoreCreateMutex();
 dl_matrix3du_t* httpFrontBuffer = nullptr;
 
 static esp_err_t stream_handler(httpd_req_t *req)
@@ -33,19 +33,22 @@ static esp_err_t stream_handler(httpd_req_t *req)
         }
         else
         {
-            bool jpeg_converted = fmt2jpg(
-            httpFrontBuffer->item, 
-            httpFrontBuffer->stride * httpFrontBuffer->h,
-            httpFrontBuffer->w,
-            httpFrontBuffer->h,
-            PIXFORMAT_RGB888,
-            80, &_jpg_buf, &_jpg_buf_len);
-            
-            if (!jpeg_converted)
+            xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
             {
-                Serial.println("JPEG compression failed");
-                res = ESP_FAIL;
+                Serial.println("Compressing RGB to JPEG");
+                if (!fmt2jpg(
+                        httpFrontBuffer->item, 
+                        httpFrontBuffer->stride * httpFrontBuffer->h,
+                        httpFrontBuffer->w,
+                        httpFrontBuffer->h,
+                        PIXFORMAT_RGB888,
+                        80, &_jpg_buf, &_jpg_buf_len))
+                {
+                    Serial.println("JPEG compression failed");
+                    res = ESP_FAIL;
+                }
             }
+            xSemaphoreGiveRecursive(bufferSemaphore);
         }
 
         if (res == ESP_OK)
@@ -99,17 +102,18 @@ CameraServer::~CameraServer()
 bool CameraServer::StartServer()
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.task_priority = 1;
     config.server_port = 80;
 
-    httpd_uri_t index_uri = {.uri = "/",
+    httpd_uri_t indexUri = {.uri = "/",
                              .method = HTTP_GET,
                              .handler = stream_handler,
                              .user_ctx = NULL};
 
     //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
-    if (httpd_start(&stream_httpd, &config) == ESP_OK)
+    if (httpd_start(&indexHtmlHandler, &config) == ESP_OK)
     {
-        httpd_register_uri_handler(stream_httpd, &index_uri);
+        httpd_register_uri_handler(indexHtmlHandler, &indexUri);
         return true;
     }
 
@@ -180,8 +184,12 @@ dl_matrix3du_t* CameraServer::CaptureFrame()
         memset(_backRgbBuffer->item, 255, _backRgbBuffer->stride * _backRgbBuffer->h);
     }
 
-    std::swap(_frontRgbBuffer, _backRgbBuffer);
-    httpFrontBuffer = _frontRgbBuffer;
+    xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
+    {
+        std::swap(_frontRgbBuffer, _backRgbBuffer);
+        httpFrontBuffer = _frontRgbBuffer;
+    }
+    xSemaphoreGiveRecursive(bufferSemaphore);
 
     if (!fmt2rgb888(fb->buf, fb->len, fb->format, _backRgbBuffer->item))
     {
