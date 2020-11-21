@@ -58,7 +58,7 @@ OCR::~OCR()
     }  
 }
 
-int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int rectY, const int rectWidth, const int rectHeight)
+int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int rectY, const int rectWidth, const int rectHeight, float* confidence)
 {
     auto start = millis();
     ImageUtils::GetNormalizedPixels(
@@ -82,16 +82,21 @@ int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int re
         return -1;
     }
 
-    float bestConv = 0.0;
+    float bestConf = 0.0;
     int bestMatch = -1;
     for (int i = 0; i < 10; i++)
     {        
         Serial.println(String(i) + " -> " + _output->data.f[i] * 100);
-        if (_output->data.f[i] > bestConv)
+        if (_output->data.f[i] > bestConf)
         {
-            bestConv = _output->data.f[i];
+            bestConf = _output->data.f[i];
             bestMatch = i;
         }
+    }
+
+    if (confidence != nullptr)
+    {
+        *confidence = bestConf;
     }
     
     end = millis();
