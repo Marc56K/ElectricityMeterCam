@@ -6,6 +6,8 @@
 #include "WifiHelper.h"
 #include "OCR.h"
 
+#define LED_PIN 4
+
 //OCR ocr(ocr_model_22x32_tflite, 22, 32);
 OCR ocr(ocr_model_28x28_tflite, 28, 28);
 CameraServer camServer;
@@ -23,6 +25,11 @@ void setup()
     if (camServer.InitCamera(false))
     {
         camServer.StartServer();
+
+        // switch on the lights
+        pinMode(LED_PIN, OUTPUT);
+        digitalWrite(LED_PIN, HIGH);
+
         Serial.println("started");
     }
 }
