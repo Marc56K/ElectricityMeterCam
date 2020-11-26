@@ -7,17 +7,17 @@ void WifiHelper::Connect()
     Serial.print("Connecting to WiFi: ");
     Serial.println(WIFI_SSID);
     WiFi.begin(WIFI_SSID, WIFI_KEY);
-    delay(50);
+    delay(500);
     if (!WiFi.isConnected())
     {
-        delay(200);
+        delay(500);
         WiFi.disconnect();
         WiFi.begin(WIFI_SSID, WIFI_KEY);
 
         while (!WiFi.isConnected())
         {
-            delay(500);
-            Serial.print(".");
+            delay(1000);
+            Serial.print("retry.");
         }
     }
 

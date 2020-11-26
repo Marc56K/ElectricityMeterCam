@@ -45,7 +45,12 @@ int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width
 
 void loop()
 {
+    Serial.println("Bitte lächeln");
+    digitalWrite(LED_PIN, HIGH);
+    delay(1000);
     auto* frame = camServer.CaptureFrame();    
+    digitalWrite(LED_PIN, LOW);
+    Serial.println("Auswertung");
     if (frame != nullptr)
     {
         int left = 24;
@@ -58,5 +63,6 @@ void loop()
         }
         Serial.println(String("VALUE: ") + result);
     }
-    delay(100);
+    Serial.println("delay30000");
+    delay(30000);
 }
