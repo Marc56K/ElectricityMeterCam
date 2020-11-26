@@ -11,6 +11,7 @@
 //OCR ocr(ocr_model_22x32_tflite, 22, 32);
 OCR ocr(ocr_model_28x28_tflite, 28, 28);
 CameraServer camServer;
+unsigned long time_now = 0;
 
 void setup()
 {
@@ -43,11 +44,18 @@ int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width
     return digit;
 }
 
+void warten(unsigned long milisec)
+{
+    time_now = millis();
+    while(millis() < (time_now + milisec)){}
+}
+
+
 void loop()
 {
     Serial.println("Bitte lächeln");
     digitalWrite(LED_PIN, HIGH);
-    delay(1000);
+    warten(1000);
     auto* frame = camServer.CaptureFrame();    
     digitalWrite(LED_PIN, LOW);
     Serial.println("Auswertung");
@@ -63,6 +71,6 @@ void loop()
         }
         Serial.println(String("VALUE: ") + result);
     }
-    Serial.println("delay30000");
-    delay(30000);
+    //Serial.println("warte 30 Sekunden");
+    warten(100);
 }
