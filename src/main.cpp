@@ -35,9 +35,9 @@ void setup()
     }
 }
 
-int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height)
+int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height, float* confidence)
 {
-    int digit = ocr.PredictDigit(frame, x, y, width, height);
+    int digit = ocr.PredictDigit(frame, x, y, width, height, confidence);
     //Serial.println(String("PREDICTION: ") + digit);
     ImageUtils::DrawRect(x, y, width, height, COLOR_RED, frame);
     ImageUtils::DrawText(x + width / 5, y + height, COLOR_RED, String(digit), frame);
@@ -63,13 +63,16 @@ void loop()
     {
         int left = 20;
         int stepSize = 38;
+        float minConf = 1.0;
         float result = 0;
+        float confidence = 0;
         for (int i = 0; i < 7; i++)
         {
-            int digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42);
+            int digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);
+            minConf = std::min(confidence, minConf);
             result += pow(10, 5 - i) * digit;
         }
-        Serial.println(String("VALUE: ") + result);
+        Serial.println(String("VALUE: ") + result + " kWh (" + (minConf * 100) + "%)");
     }
     //Serial.println("warte 30 Sekunden");
     warten(100);

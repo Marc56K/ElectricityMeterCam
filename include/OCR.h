@@ -17,7 +17,8 @@ public:
         const int rectX, 
         const int rectY, 
         const int rectWidth, 
-        const int rectHeight);
+        const int rectHeight,
+        float* confidence = nullptr);
 
 private:
     int _inputWidth;
