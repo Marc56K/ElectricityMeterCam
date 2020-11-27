@@ -61,12 +61,12 @@ void loop()
     Serial.println("Auswertung");
     if (frame != nullptr)
     {
-        int left = 24;
-        int stepSize = 40;
+        int left = 20;
+        int stepSize = 38;
         float result = 0;
         for (int i = 0; i < 7; i++)
         {
-            int digit = DetectDigit(frame, left + stepSize * i, 98, 32, 42);
+            int digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42);
             result += pow(10, 5 - i) * digit;
         }
         Serial.println(String("VALUE: ") + result);
