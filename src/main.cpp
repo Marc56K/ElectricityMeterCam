@@ -16,7 +16,7 @@ unsigned long time_now = 0;
 void setup()
 {
     //disable brownout detector
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
+    //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
 
     Serial.begin(115200);
     Serial.println("starting ...");
@@ -46,8 +46,9 @@ int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width
 
 void warten(unsigned long milisec)
 {
-    time_now = millis();
-    while(millis() < (time_now + milisec)){}
+    //time_now = millis();
+    //while(millis() < (time_now + milisec)){}
+    vTaskDelay(milisec * portTICK_PERIOD_MS);
 }
 
 
@@ -61,8 +62,8 @@ void loop()
     Serial.println("Auswertung");
     if (frame != nullptr)
     {
-        int left = 20;
-        int stepSize = 38;
+        int left = 18;
+        int stepSize = 37;
         float minConf = 1.0;
         float result = 0;
         float confidence = 0;
