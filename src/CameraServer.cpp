@@ -1,5 +1,6 @@
 #include "CameraServer.h"
 #include <Arduino.h>
+#include "ImageUtils.h"
 #include "esp_http_server.h"
 #include "camera_pins.h"
 
@@ -7,13 +8,12 @@
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
-httpd_handle_t port80Server = nullptr;
-httpd_handle_t port81Server = nullptr;
+httpd_handle_t httpServer = nullptr;
 SemaphoreHandle_t bufferSemaphore = xSemaphoreCreateMutex();
 dl_matrix3du_t* httpFrontRgbBuffer = nullptr;
 float latestKwhValue = 0;
 
-static esp_err_t port80IndexHandler(httpd_req_t *req)
+static esp_err_t HttpGet_CameraStreamHandler(httpd_req_t *req)
 {
     esp_err_t res = ESP_OK;
     size_t _jpg_buf_len = 0;
@@ -38,6 +38,13 @@ static esp_err_t port80IndexHandler(httpd_req_t *req)
             xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
             {
                 Serial.println("Compressing RGB to JPEG");
+                static uint32_t imgIdx = 0;
+                imgIdx++;
+
+                ImageUtils::DrawRect(
+                    0, 0, httpFrontRgbBuffer->w, httpFrontRgbBuffer->h,
+                    imgIdx % 2 == 0 ? COLOR_RED : COLOR_BLACK, httpFrontRgbBuffer);
+
                 if (!fmt2jpg(
                         httpFrontRgbBuffer->item, 
                         httpFrontRgbBuffer->stride * httpFrontRgbBuffer->h,
@@ -86,7 +93,7 @@ static esp_err_t port80IndexHandler(httpd_req_t *req)
     return res;
 }
 
-static esp_err_t port81IndexHandler(httpd_req_t *req)
+static esp_err_t HttpGet_KwhHandler(httpd_req_t *req)
 {
     String str(latestKwhValue);
     httpd_resp_send(req, str.c_str(), str.length());
@@ -101,11 +108,8 @@ CameraServer::CameraServer() :
 
 CameraServer::~CameraServer()
 {
-    if (port80Server != nullptr)
-        httpd_stop(port80Server);
-
-    if (port81Server != nullptr)
-        httpd_stop(port81Server);
+    if (httpServer != nullptr)
+        httpd_stop(httpServer);
 
     if (_frontRgbBuffer != nullptr)
         dl_matrix3du_free(_frontRgbBuffer);
@@ -116,44 +120,32 @@ CameraServer::~CameraServer()
 
 bool CameraServer::StartServer()
 {
-    // camera server on port 80
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.task_priority = 1;
+    config.server_port = 80;
+
+    Serial.printf("Starting http server on port: '%d'\n", config.server_port);
+    if (httpd_start(&httpServer, &config) == ESP_OK)
     {
-        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-        config.task_priority = 1;
-        config.server_port = 80;
-
-        Serial.printf("Starting camera server on port: '%d'\n", config.server_port);
-        if (httpd_start(&port80Server, &config) == ESP_OK)
+        httpd_uri_t indexUri = 
         {
-            httpd_uri_t port80IndexUri = 
-            {
-                .uri = "/",
-                .method = HTTP_GET,
-                .handler = port80IndexHandler,
-                .user_ctx = nullptr
-            };
-            httpd_register_uri_handler(port80Server, &port80IndexUri);
-        }
-    }
+            .uri = "/",
+            .method = HTTP_GET,
+            .handler = HttpGet_CameraStreamHandler,
+            .user_ctx = nullptr
+        };
+        httpd_register_uri_handler(httpServer, &indexUri);
 
-    // data server port 81
-    {
-        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-        config.server_port = 81;
-        config.ctrl_port++;
-
-        Serial.printf("Starting data server on port: '%d'\n", config.server_port);
-        if (httpd_start(&port81Server, &config) == ESP_OK)
+        httpd_uri_t kwhUri = 
         {
-            httpd_uri_t port81IndexUri = 
-            {
-                .uri = "/",
-                .method = HTTP_GET,
-                .handler = port81IndexHandler,
-                .user_ctx = nullptr
-            };
-            httpd_register_uri_handler(port81Server, &port81IndexUri);
-        }
+            .uri = "/kwh",
+            .method = HTTP_GET,
+            .handler = HttpGet_KwhHandler,
+            .user_ctx = nullptr
+        };
+        httpd_register_uri_handler(httpServer, &kwhUri);
+
+        return true;
     }
 
     return false;
@@ -207,6 +199,7 @@ bool CameraServer::InitCamera(const bool flipImage)
 
 dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
 {
+    static uint32_t frameIdx = 0;
     camera_fb_t *fb = esp_camera_fb_get();
     if (fb == nullptr)
     {
@@ -246,11 +239,17 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
         rgbValid = false;
         Serial.println("fmt2rgb888 failed");
     }
+    else
+    {
+        ImageUtils::DrawText(5, 5, COLOR_BLUE, String("") + frameIdx, _backRgbBuffer);
+    }
 
     if (fb != nullptr)
     {
         esp_camera_fb_return(fb);
     }
+
+    frameIdx++;
 
     if (!rgbValid)
     {

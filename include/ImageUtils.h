@@ -14,6 +14,7 @@ class ImageUtils
 {
 public:
     static void DrawRect(const int x, const int y, const int w, const int h, const uint32_t color, dl_matrix3du_t* dst);
+    static void DrawFillRect(const int x, const int y, const int w, const int h, const uint32_t color, dl_matrix3du_t* dst);
     static void DrawText(const int x, const int y, const uint32_t color, const String& txt, dl_matrix3du_t* dst);
 
     static void GetNormalizedPixels(

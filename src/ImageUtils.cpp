@@ -15,6 +15,18 @@ void ImageUtils::DrawRect(const int x, const int y, const int w, const int h, co
     fb_gfx_drawFastVLine(&fb, x+w-1, y, h, color);
 }
 
+void ImageUtils::DrawFillRect(const int x, const int y, const int w, const int h, const uint32_t color, dl_matrix3du_t* dst)
+{
+    fb_data_t fb;
+    fb.width = dst->w;
+    fb.height = dst->h;
+    fb.data = dst->item;
+    fb.bytes_per_pixel = 3;
+    fb.format = FB_BGR888;
+
+    fb_gfx_fillRect(&fb, x, y, w, h, color);
+}
+
 void ImageUtils::DrawText(const int x, const int y, const uint32_t color, const String& txt, dl_matrix3du_t* dst)
 {
     fb_data_t fb;
