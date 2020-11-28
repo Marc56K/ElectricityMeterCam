@@ -8,6 +8,7 @@
 #define COLOR_RED    0x000000FF
 #define COLOR_GREEN  0x0000FF00
 #define COLOR_BLUE   0x00FF0000
+#define COLOR_YELLOW 0x0000FFFF
 
 class ImageUtils
 {
@@ -24,4 +25,6 @@ public:
         float* dst,
         const int dstWidth,
         const int dstHeight);
+
+    static uint32_t GetColorFromConfidence(const float confidence); 
 };

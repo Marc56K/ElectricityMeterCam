@@ -78,3 +78,32 @@ void ImageUtils::GetNormalizedPixels(
         }
     }
 }
+
+uint32_t ImageUtils::GetColorFromConfidence(const float confidence)
+{
+    float bf = 0.0f;
+    uint32_t colorA = 0;
+    uint32_t colorB = 0;
+    if (confidence < 0.5f)
+    {
+        bf = confidence * 2.0f;
+        colorA = COLOR_RED;
+        colorB = COLOR_YELLOW;
+    }
+    else
+    {
+        bf = (confidence - 0.5f) * 2.0f;
+        colorA = COLOR_YELLOW;
+        colorB = COLOR_GREEN;
+    }
+
+    uint8_t* a = (uint8_t*)&colorA;
+    uint8_t* b = (uint8_t*)&colorB;
+    uint8_t result[4];
+    for (uint8_t i = 0; i < 4; ++i)
+    {
+        result[i] = (uint8_t)((1.0f - bf) * a[i] + bf * b[i]);
+    }
+
+    return *((uint32_t*)result);
+}

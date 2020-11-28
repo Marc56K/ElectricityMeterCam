@@ -11,12 +11,11 @@
 //OCR ocr(ocr_model_22x32_tflite, 22, 32);
 OCR ocr(ocr_model_28x28_tflite, 28, 28);
 CameraServer camServer;
-unsigned long time_now = 0;
 
 void setup()
 {
     //disable brownout detector
-    //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
 
     Serial.begin(115200);
     Serial.println("starting ...");
@@ -39,18 +38,16 @@ int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width
 {
     int digit = ocr.PredictDigit(frame, x, y, width, height, confidence);
     //Serial.println(String("PREDICTION: ") + digit);
-    ImageUtils::DrawRect(x, y, width, height, COLOR_RED, frame);
-    ImageUtils::DrawText(x + width / 5, y + height, COLOR_RED, String(digit), frame);
+    uint32_t color = ImageUtils::GetColorFromConfidence(*confidence);
+    ImageUtils::DrawRect(x, y, width, height, color, frame);
+    ImageUtils::DrawText(x + width / 5, y + height, color, String(digit), frame);
     return digit;
 }
 
 void warten(unsigned long milisec)
 {
-    //time_now = millis();
-    //while(millis() < (time_now + milisec)){}
     vTaskDelay(milisec * portTICK_PERIOD_MS);
 }
-
 
 void loop()
 {
