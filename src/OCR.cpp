@@ -86,13 +86,15 @@ int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int re
     int bestMatch = -1;
     for (int i = 0; i < 10; i++)
     {        
-        Serial.println(String(i) + " -> " + _output->data.f[i] * 100);
+        Serial.print(String("[") + i + "](" + (int)round(_output->data.f[i] * 100) + "%) ");
         if (_output->data.f[i] > bestConf)
         {
             bestConf = _output->data.f[i];
             bestMatch = i;
         }
     }
+
+    Serial.println();
 
     if (confidence != nullptr)
     {
