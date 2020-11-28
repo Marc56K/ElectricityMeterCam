@@ -77,7 +77,7 @@ void loop()
             result += pow(10, 5 - i) * digit;
         }
         Serial.println(String("VALUE: ") + result + " kWh (" + (minConf * 100) + "%)");
-        sdCard.AppendToFile("/kwh.csv", String("") + millis() + "\t" + result + "\t" + minConf);
+        sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + result + "\t" + minConf);
     }
     //Serial.println("warte 30 Sekunden");
     warten(100);

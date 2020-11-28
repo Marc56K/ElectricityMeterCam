@@ -53,12 +53,12 @@ bool SDCard::IsAvailable()
     return _available;
 }
 
-bool SDCard::AppendToFile(const String& filePath, const String& line)
+bool SDCard::WriteToFile(const String& filePath, const String& line, const bool append)
 {
     if (IsAvailable())
     {
         Serial.println(String("Writing '") + filePath + "' " + line);
-        File file = SD_MMC.open(filePath, SD_MMC.exists(filePath) ? FILE_APPEND : FILE_WRITE);
+        File file = SD_MMC.open(filePath, append ? FILE_APPEND : FILE_WRITE);
         if(!file)
         {
             return false;
