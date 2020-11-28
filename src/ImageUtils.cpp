@@ -91,20 +91,24 @@ void ImageUtils::GetNormalizedPixels(
     }
 }
 
-uint32_t ImageUtils::GetColorFromConfidence(const float confidence)
+uint32_t ImageUtils::GetColorFromConfidence(const float confidence, const float min, const float max)
 {
+    float value = (confidence - min) / (max - min);
+    value = std::max(value, 0.0f);
+    value = std::min(value, 1.0f);
+
     float bf = 0.0f;
     uint32_t colorA = 0;
     uint32_t colorB = 0;
-    if (confidence < 0.5f)
+    if (value < 0.5f)
     {
-        bf = confidence * 2.0f;
+        bf = value * 2.0f;
         colorA = COLOR_RED;
         colorB = COLOR_YELLOW;
     }
     else
     {
-        bf = (confidence - 0.5f) * 2.0f;
+        bf = (value - 0.5f) * 2.0f;
         colorA = COLOR_YELLOW;
         colorB = COLOR_GREEN;
     }

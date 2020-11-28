@@ -43,8 +43,7 @@ void setup()
 int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height, float* confidence)
 {
     int digit = ocr.PredictDigit(frame, x, y, width, height, confidence);
-    //Serial.println(String("PREDICTION: ") + digit);
-    uint32_t color = ImageUtils::GetColorFromConfidence(*confidence);
+    uint32_t color = ImageUtils::GetColorFromConfidence(*confidence, 0.4f, 1.0f);
     ImageUtils::DrawRect(x, y, width, height, color, frame);
     ImageUtils::DrawText(x + width / 5, y + height, color, String(digit), frame);
     return digit;

@@ -27,5 +27,5 @@ public:
         const int dstWidth,
         const int dstHeight);
 
-    static uint32_t GetColorFromConfidence(const float confidence); 
+    static uint32_t GetColorFromConfidence(const float confidence, const float min, const float max); 
 };
