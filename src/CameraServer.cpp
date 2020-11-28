@@ -16,8 +16,8 @@ float latestKwhValue = 0;
 static esp_err_t port80IndexHandler(httpd_req_t *req)
 {
     esp_err_t res = ESP_OK;
-    static size_t _jpg_buf_len = 0;
-    static uint8_t *_jpg_buf = nullptr;
+    size_t _jpg_buf_len = 0;
+    uint8_t *_jpg_buf = nullptr;
     char *part_buf[64];
 
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
@@ -30,23 +30,13 @@ static esp_err_t port80IndexHandler(httpd_req_t *req)
     {
         if (httpFrontRgbBuffer == nullptr)
         {
-            if (_jpg_buf == nullptr)
-            {
-                Serial.println("Camera capture failed");
-                res = ESP_FAIL;
-            }
+            Serial.println("Camera capture failed");
+            res = ESP_FAIL;
         }
         else
         {
             xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
             {
-                if (_jpg_buf)
-                {
-                    free(_jpg_buf);
-                    _jpg_buf = nullptr;
-                    _jpg_buf_len = 0;
-                }
-
                 Serial.println("Compressing RGB to JPEG");
                 if (!fmt2jpg(
                         httpFrontRgbBuffer->item, 
@@ -59,7 +49,6 @@ static esp_err_t port80IndexHandler(httpd_req_t *req)
                     Serial.println("JPEG compression failed");
                     res = ESP_FAIL;
                 }
-                httpFrontRgbBuffer = nullptr;
             }
             xSemaphoreGiveRecursive(bufferSemaphore);
         }
@@ -78,6 +67,12 @@ static esp_err_t port80IndexHandler(httpd_req_t *req)
         if (res == ESP_OK)
         {
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+        }
+
+        if (_jpg_buf)
+        {
+            free(_jpg_buf);
+            _jpg_buf = nullptr;
         }
 
         if (res != ESP_OK)
