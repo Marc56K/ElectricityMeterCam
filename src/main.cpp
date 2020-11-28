@@ -2,6 +2,7 @@
 #include "soc/soc.h"          //disable brownout problems
 #include "soc/rtc_cntl_reg.h" //disable brownout problems
 
+#include "SDCard.h"
 #include "CameraServer.h"
 #include "WifiHelper.h"
 #include "OCR.h"
@@ -9,6 +10,7 @@
 #define LED_PIN 4
 
 //OCR ocr(ocr_model_22x32_tflite, 22, 32);
+SDCard sdCard;
 OCR ocr(ocr_model_28x28_tflite, 28, 28);
 CameraServer camServer;
 
@@ -20,15 +22,19 @@ void setup()
     Serial.begin(115200);
     Serial.println("starting ...");
 
+    if (sdCard.Init())
+    {
+        Serial.println("SD-Card connected");
+    }
+
     WifiHelper::Connect();
 
     if (camServer.InitCamera(false))
     {
         camServer.StartServer();
 
-        // switch on the lights
         pinMode(LED_PIN, OUTPUT);
-        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_PIN, LOW);
 
         Serial.println("started");
     }
@@ -71,6 +77,7 @@ void loop()
             result += pow(10, 5 - i) * digit;
         }
         Serial.println(String("VALUE: ") + result + " kWh (" + (minConf * 100) + "%)");
+        sdCard.AppendToFile("/kwh.csv", String("") + millis() + "\t" + result + "\t" + minConf);
     }
     //Serial.println("warte 30 Sekunden");
     warten(100);
