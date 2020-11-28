@@ -61,24 +61,27 @@ void loop()
     digitalWrite(LED_PIN, HIGH);
     warten(1000);
     auto* frame = camServer.CaptureFrame(&sdCard);    
-    digitalWrite(LED_PIN, LOW);
-    Serial.println("Auswertung");
+    digitalWrite(LED_PIN, LOW);    
     if (frame != nullptr)
     {
+        Serial.println("Auswertung");
         int left = 18;
         int stepSize = 37;
         float minConf = 1.0;
-        float result = 0;
+        float kwh = 0;
         float confidence = 0;
         for (int i = 0; i < 7; i++)
         {
             int digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);
             minConf = std::min(confidence, minConf);
-            result += pow(10, 5 - i) * digit;
+            kwh += pow(10, 5 - i) * digit;
         }
-        Serial.println(String("VALUE: ") + result + " kWh (" + (minConf * 100) + "%)");
-        sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + result + "\t" + minConf);
+
+        camServer.SetLatestKwh(kwh);
+
+        Serial.println(String("VALUE: ") + kwh + " kWh (" + (minConf * 100) + "%)");
+        sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + kwh + "\t" + minConf);
     }
-    //Serial.println("warte 30 Sekunden");
+
     warten(100);
 }
