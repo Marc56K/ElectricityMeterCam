@@ -7,16 +7,17 @@
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
-httpd_handle_t httpServerHandle = nullptr;
+httpd_handle_t port80Server = nullptr;
+httpd_handle_t port81Server = nullptr;
 SemaphoreHandle_t bufferSemaphore = xSemaphoreCreateMutex();
 dl_matrix3du_t* httpFrontRgbBuffer = nullptr;
 float latestKwhValue = 0;
 
-static esp_err_t uriIndexHandler(httpd_req_t *req)
+static esp_err_t port80IndexHandler(httpd_req_t *req)
 {
     esp_err_t res = ESP_OK;
-    size_t _jpg_buf_len = 0;
-    uint8_t *_jpg_buf = NULL;
+    static size_t _jpg_buf_len = 0;
+    static uint8_t *_jpg_buf = nullptr;
     char *part_buf[64];
 
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
@@ -29,13 +30,23 @@ static esp_err_t uriIndexHandler(httpd_req_t *req)
     {
         if (httpFrontRgbBuffer == nullptr)
         {
-            Serial.println("Camera capture failed");
-            res = ESP_FAIL;
+            if (_jpg_buf == nullptr)
+            {
+                Serial.println("Camera capture failed");
+                res = ESP_FAIL;
+            }
         }
         else
         {
             xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
             {
+                if (_jpg_buf)
+                {
+                    free(_jpg_buf);
+                    _jpg_buf = nullptr;
+                    _jpg_buf_len = 0;
+                }
+
                 Serial.println("Compressing RGB to JPEG");
                 if (!fmt2jpg(
                         httpFrontRgbBuffer->item, 
@@ -48,6 +59,7 @@ static esp_err_t uriIndexHandler(httpd_req_t *req)
                     Serial.println("JPEG compression failed");
                     res = ESP_FAIL;
                 }
+                httpFrontRgbBuffer = nullptr;
             }
             xSemaphoreGiveRecursive(bufferSemaphore);
         }
@@ -68,12 +80,6 @@ static esp_err_t uriIndexHandler(httpd_req_t *req)
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
         }
 
-        if (_jpg_buf)
-        {
-            free(_jpg_buf);
-            _jpg_buf = NULL;
-        }
-
         if (res != ESP_OK)
         {
             break;
@@ -85,7 +91,7 @@ static esp_err_t uriIndexHandler(httpd_req_t *req)
     return res;
 }
 
-static esp_err_t uriKwhHandler(httpd_req_t *req)
+static esp_err_t port81IndexHandler(httpd_req_t *req)
 {
     String str(latestKwhValue);
     httpd_resp_send(req, str.c_str(), str.length());
@@ -100,6 +106,12 @@ CameraServer::CameraServer() :
 
 CameraServer::~CameraServer()
 {
+    if (port80Server != nullptr)
+        httpd_stop(port80Server);
+
+    if (port81Server != nullptr)
+        httpd_stop(port81Server);
+
     if (_frontRgbBuffer != nullptr)
         dl_matrix3du_free(_frontRgbBuffer);
 
@@ -109,32 +121,44 @@ CameraServer::~CameraServer()
 
 bool CameraServer::StartServer()
 {
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.task_priority = 1;
-    config.server_port = 80;
-
-    //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
-    if (httpd_start(&httpServerHandle, &config) == ESP_OK)
+    // camera server on port 80
     {
-        httpd_uri_t indexUri = 
-        {
-            .uri = "/",
-            .method = HTTP_GET,
-            .handler = uriIndexHandler,
-            .user_ctx = nullptr
-        };
-        httpd_register_uri_handler(httpServerHandle, &indexUri);
+        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+        config.task_priority = 1;
+        config.server_port = 80;
 
-        httpd_uri_t kwhUri = 
+        Serial.printf("Starting camera server on port: '%d'\n", config.server_port);
+        if (httpd_start(&port80Server, &config) == ESP_OK)
         {
-            .uri = "/kwh",
-            .method = HTTP_GET,
-            .handler = uriKwhHandler,
-            .user_ctx = nullptr
-        };
-        httpd_register_uri_handler(httpServerHandle, &kwhUri);
+            httpd_uri_t port80IndexUri = 
+            {
+                .uri = "/",
+                .method = HTTP_GET,
+                .handler = port80IndexHandler,
+                .user_ctx = nullptr
+            };
+            httpd_register_uri_handler(port80Server, &port80IndexUri);
+        }
+    }
 
-        return true;
+    // data server port 81
+    {
+        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+        config.server_port = 81;
+        config.ctrl_port++;
+
+        Serial.printf("Starting data server on port: '%d'\n", config.server_port);
+        if (httpd_start(&port81Server, &config) == ESP_OK)
+        {
+            httpd_uri_t port81IndexUri = 
+            {
+                .uri = "/",
+                .method = HTTP_GET,
+                .handler = port81IndexHandler,
+                .user_ctx = nullptr
+            };
+            httpd_register_uri_handler(port81Server, &port81IndexUri);
+        }
     }
 
     return false;
