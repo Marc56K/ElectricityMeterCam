@@ -166,13 +166,23 @@ bool CameraServer::InitCamera(const bool flipImage)
     return true;
 }
 
-dl_matrix3du_t* CameraServer::CaptureFrame()
+dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
 {
     camera_fb_t *fb = esp_camera_fb_get();
     if (fb == nullptr)
     {
         Serial.println("Camera capture failed");
         return nullptr;
+    }
+
+    if (sdCard != nullptr)
+    {
+        File file;
+        if (sdCard->CreateNextFile("/", String("img") + ".jpg", file))
+        {
+            file.write(fb->buf, fb->len);
+            file.close();
+        }
     }
 
     if (_backRgbBuffer == nullptr)

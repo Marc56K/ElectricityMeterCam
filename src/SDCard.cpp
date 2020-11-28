@@ -1,6 +1,4 @@
 #include "SDCard.h"
-#include "FS.h"
-#include "SD_MMC.h"
 
 SDCard::SDCard() :
     _available(false)
@@ -71,5 +69,41 @@ bool SDCard::WriteToFile(const String& filePath, const String& line, const bool 
         return true;
     }
 
+    return false;
+}
+
+bool SDCard::CreateNextFile(const String& dir, const String& name, File& file)
+{
+    if (IsAvailable())
+    {
+        String idxFilePath = dir + "/" + name + ".idx";
+        uint32_t nextIdx = 0;
+        if (SD_MMC.exists(idxFilePath))
+        {
+            File idxFile = SD_MMC.open(idxFilePath, FILE_READ);
+            if (idxFile)
+            {
+                idxFile.read((uint8_t*)&nextIdx, sizeof(nextIdx));
+                idxFile.close();
+            }
+        }
+
+        String filePath = dir + "/" + nextIdx + "_" + millis() + "_" + name;
+        Serial.println(String("Writing '") + filePath + "'");
+        file = SD_MMC.open(filePath, FILE_WRITE);
+        
+        // write next index to *.idx file
+        if (file)
+        {
+            nextIdx++;
+            File idxFile = SD_MMC.open(idxFilePath, FILE_WRITE);
+            if (idxFile)
+            {
+                idxFile.write((uint8_t*)&nextIdx, sizeof(nextIdx));
+                idxFile.close();
+            }
+            return true;
+        }
+    }
     return false;
 }

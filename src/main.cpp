@@ -60,7 +60,7 @@ void loop()
     Serial.println("Bitte lächeln");
     digitalWrite(LED_PIN, HIGH);
     warten(1000);
-    auto* frame = camServer.CaptureFrame();    
+    auto* frame = camServer.CaptureFrame(&sdCard);    
     digitalWrite(LED_PIN, LOW);
     Serial.println("Auswertung");
     if (frame != nullptr)
