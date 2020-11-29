@@ -8,11 +8,13 @@
 #define COLOR_RED    0x000000FF
 #define COLOR_GREEN  0x0000FF00
 #define COLOR_BLUE   0x00FF0000
+#define COLOR_YELLOW 0x0000FFFF
 
 class ImageUtils
 {
 public:
     static void DrawRect(const int x, const int y, const int w, const int h, const uint32_t color, dl_matrix3du_t* dst);
+    static void DrawFillRect(const int x, const int y, const int w, const int h, const uint32_t color, dl_matrix3du_t* dst);
     static void DrawText(const int x, const int y, const uint32_t color, const String& txt, dl_matrix3du_t* dst);
 
     static void GetNormalizedPixels(
@@ -24,4 +26,6 @@ public:
         float* dst,
         const int dstWidth,
         const int dstHeight);
+
+    static uint32_t GetColorFromConfidence(const float confidence, const float min, const float max); 
 };

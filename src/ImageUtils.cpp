@@ -15,6 +15,18 @@ void ImageUtils::DrawRect(const int x, const int y, const int w, const int h, co
     fb_gfx_drawFastVLine(&fb, x+w-1, y, h, color);
 }
 
+void ImageUtils::DrawFillRect(const int x, const int y, const int w, const int h, const uint32_t color, dl_matrix3du_t* dst)
+{
+    fb_data_t fb;
+    fb.width = dst->w;
+    fb.height = dst->h;
+    fb.data = dst->item;
+    fb.bytes_per_pixel = 3;
+    fb.format = FB_BGR888;
+
+    fb_gfx_fillRect(&fb, x, y, w, h, color);
+}
+
 void ImageUtils::DrawText(const int x, const int y, const uint32_t color, const String& txt, dl_matrix3du_t* dst)
 {
     fb_data_t fb;
@@ -77,4 +89,37 @@ void ImageUtils::GetNormalizedPixels(
             }
         }
     }
+}
+
+uint32_t ImageUtils::GetColorFromConfidence(const float confidence, const float min, const float max)
+{
+    float value = (confidence - min) / (max - min);
+    value = std::max(value, 0.0f);
+    value = std::min(value, 1.0f);
+
+    float bf = 0.0f;
+    uint32_t colorA = 0;
+    uint32_t colorB = 0;
+    if (value < 0.5f)
+    {
+        bf = value * 2.0f;
+        colorA = COLOR_RED;
+        colorB = COLOR_YELLOW;
+    }
+    else
+    {
+        bf = (value - 0.5f) * 2.0f;
+        colorA = COLOR_YELLOW;
+        colorB = COLOR_GREEN;
+    }
+
+    uint8_t* a = (uint8_t*)&colorA;
+    uint8_t* b = (uint8_t*)&colorB;
+    uint8_t result[4];
+    for (uint8_t i = 0; i < 4; ++i)
+    {
+        result[i] = (uint8_t)((1.0f - bf) * a[i] + bf * b[i]);
+    }
+
+    return *((uint32_t*)result);
 }
