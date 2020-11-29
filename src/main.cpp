@@ -29,7 +29,7 @@ void setup()
 
         // switch on the lights
         pinMode(LED_PIN, OUTPUT);
-        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED_PIN, LOW);            
 
         Serial.println("started");
     }
@@ -56,7 +56,7 @@ void loop()
 {
     Serial.println("Bitte lächeln");
     digitalWrite(LED_PIN, HIGH);
-    warten(1000);
+    warten(2000);
     auto* frame = camServer.CaptureFrame();    
     digitalWrite(LED_PIN, LOW);
     Serial.println("Auswertung");
@@ -76,5 +76,5 @@ void loop()
         Serial.println(String("VALUE: ") + result + " kWh (" + (minConf * 100) + "%)");
     }
     //Serial.println("warte 30 Sekunden");
-    warten(100);
+    warten(3000);
 }
