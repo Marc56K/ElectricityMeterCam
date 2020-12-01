@@ -77,14 +77,14 @@ void loop()
         for (int i = 0; i < 7; i++)
         {
             switch(i){
-            case 0 ... 2:
+            case 0 ... 1:
                 digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);
                 break;        
-            case 3:
-                digit = DetectDigit(frame, left + (stepSize+1) * i, 133, 30, 42, &confidence);        
+            case 2 ... 3:
+                digit = DetectDigit(frame, left + (stepSize+1) * i, 134, 30, 42, &confidence);        
                 break;
-            case 4 ... 7:
-                digit = DetectDigit(frame, left + (stepSize+1) * i, 134, 30, 42, &confidence);
+            case 4 ... 6:
+                digit = DetectDigit(frame, left + (stepSize+1) * i, 135, 30, 42, &confidence);
             default:
                 break;
             }
