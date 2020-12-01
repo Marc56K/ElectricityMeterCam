@@ -56,12 +56,15 @@ void warten(unsigned long milisec)
 
 void loop()
 {
-    Serial.println("Bitte lächeln");
+    int digit = 0;
+    Serial.println("LEDs an");
     digitalWrite(LED_PIN, HIGH);
-    warten(2000);
+    warten(1000);
+    Serial.println("Bild holen");
     auto* frame = camServer.CaptureFrame(&sdCard);    
+    Serial.println("LEDs aus");
     digitalWrite(LED_PIN, LOW);
-    Serial.println("Auswertung");
+    //Serial.println("Auswertung");
     
     if (frame != nullptr)
     {
@@ -73,7 +76,14 @@ void loop()
         float confidence = 0;
         for (int i = 0; i < 7; i++)
         {
-            int digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);
+            switch(i){
+            case 1 ... 2:
+                digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);        
+            case 3:
+                digit = DetectDigit(frame, left + (stepSize+1) * i, 133, 30, 42, &confidence);        
+            case 4 ... 7:
+                digit = DetectDigit(frame, left + (stepSize+2) * i, 134, 30, 42, &confidence);        
+            }
             minConf = std::min(confidence, minConf);
             kwh += pow(10, 5 - i) * digit;
         }
@@ -83,7 +93,7 @@ void loop()
         Serial.println(String("VALUE: ") + kwh + " kWh (" + (minConf * 100) + "%)");
         sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + kwh + "\t" + minConf);
     }
-    //Serial.println("warte 30 Sekunden");
-    warten(3000);
+    //Serial.println("warte 60 Sekunden");
+    warten(60000);
 
 }
