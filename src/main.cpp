@@ -77,12 +77,16 @@ void loop()
         for (int i = 0; i < 7; i++)
         {
             switch(i){
-            case 1 ... 2:
-                digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);        
+            case 0 ... 2:
+                digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);
+                break;        
             case 3:
                 digit = DetectDigit(frame, left + (stepSize+1) * i, 133, 30, 42, &confidence);        
+                break;
             case 4 ... 7:
-                digit = DetectDigit(frame, left + (stepSize+2) * i, 134, 30, 42, &confidence);        
+                digit = DetectDigit(frame, left + (stepSize+1) * i, 134, 30, 42, &confidence);
+            default:
+                break;
             }
             minConf = std::min(confidence, minConf);
             kwh += pow(10, 5 - i) * digit;
