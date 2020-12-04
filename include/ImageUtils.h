@@ -3,12 +3,13 @@
 #include "fb_gfx.h"
 #include "fr_forward.h"
 
-#define COLOR_WHITE  0x00FFFFFF
-#define COLOR_BLACK  0x00000000
-#define COLOR_RED    0x000000FF
-#define COLOR_GREEN  0x0000FF00
-#define COLOR_BLUE   0x00FF0000
-#define COLOR_YELLOW 0x0000FFFF
+#define COLOR_WHITE     0x00FFFFFF
+#define COLOR_BLACK     0x00000000
+#define COLOR_RED       0x000000FF
+#define COLOR_GREEN     0x0000FF00
+#define COLOR_BLUE      0x00FF0000
+#define COLOR_YELLOW    0x0000FFFF
+#define COLOR_TURQUOISE 0x00D0E040
 
 class ImageUtils
 {

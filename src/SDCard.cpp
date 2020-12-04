@@ -1,59 +1,105 @@
 #include "SDCard.h"
 
-SDCard::SDCard() :
-    _available(false)
+SDCard::SDCard()
+    : _mounted(false)
 {    
 }
     
 SDCard::~SDCard()
-{    
+{
+    Unmount();
 }
 
-bool SDCard::Init()
+bool SDCard::Mount()
 {
-    _available = false;
+    if (IsMounted())
+    {
+        return true;
+    }
 
     if(!SD_MMC.begin("/sdcard", true)) // using slow mode1bit to allow use of LED on pin 4
     {
-        Serial.println("SD Card Mount Failed");
         return false;
     }
 
     switch (SD_MMC.cardType())
     {
         case CARD_MMC:
-            Serial.println("Found MMC-Card");
+            Serial.print("Mounted MMC-Card");
             break;
         case CARD_SD:
-            Serial.println("Found SD-Card");
+            Serial.print("Mounted SD-Card");
             break;
         case CARD_SDHC:
-            Serial.println("Found SDHC-Card");
+            Serial.print("Mounted SDHC-Card");
             break;
         case CARD_UNKNOWN:
-            Serial.println("Found Unknown-Card");
+            Serial.print("Mounted Unknown-Card");
             break;
         default:
-            Serial.println("No SD Card attached");
             return false;
     }
 
-    uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024 * 1024);
-    Serial.printf("SD Card Size: %lluGB\n", cardSize);
+    uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
+    Serial.printf(" (%lluMB)\n", cardSize);
 
-    _available = true;
+    _mounted = true;
 
     return true;
 }
 
-bool SDCard::IsAvailable()
+void SDCard::Unmount()
 {
-    return _available;
+    _mounted = false;
+    SD_MMC.end();
+}
+
+bool SDCard::IsMounted()
+{
+    return _mounted;
+}
+
+bool SDCard::IsWritable()
+{
+    if (IsMounted())
+    {
+        String filePath = "/.w";
+        File file = SD_MMC.open(filePath, FILE_WRITE);
+        if (file)
+        {
+            file.write(42);
+            file.close();
+        }
+        else
+        {
+            return false;
+        }
+
+        file = SD_MMC.open(filePath, FILE_READ);
+        if (file)
+        {  
+            bool result = file.read() == 42;
+            file.close();
+            SD_MMC.remove("/.w");
+            return result;
+        }
+        return false;
+    }
+    return false;
+}
+
+uint64_t SDCard::GetFreeSpaceInBytes()
+{
+    if (IsMounted())
+    {
+        return SD_MMC.totalBytes() - SD_MMC.usedBytes();
+    }
+    return 0;
 }
 
 bool SDCard::WriteToFile(const String& filePath, const String& line, const bool append)
 {
-    if (IsAvailable())
+    if (IsMounted())
     {
         Serial.println(String("Writing '") + filePath + "' " + line);
         File file = SD_MMC.open(filePath, append ? FILE_APPEND : FILE_WRITE);
@@ -74,7 +120,7 @@ bool SDCard::WriteToFile(const String& filePath, const String& line, const bool 
 
 bool SDCard::CreateNextFile(const String& dir, const String& name, File& file)
 {
-    if (IsAvailable())
+    if (IsMounted())
     {
         String idxFilePath = dir + "/" + name + ".idx";
         uint32_t nextIdx = 0;

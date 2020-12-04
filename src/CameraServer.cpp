@@ -207,7 +207,7 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
         return nullptr;
     }
 
-    if (sdCard != nullptr)
+    if (sdCard != nullptr && sdCard->IsMounted())
     {
         File file;
         if (sdCard->CreateNextFile("/", String("img") + ".jpg", file))
@@ -241,7 +241,12 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
     }
     else
     {
-        ImageUtils::DrawText(5, 5, COLOR_BLUE, String("") + frameIdx, _backRgbBuffer);
+        ImageUtils::DrawText(5, 5, COLOR_TURQUOISE, String("") + frameIdx, _backRgbBuffer);
+        
+        if (sdCard != nullptr && sdCard->IsMounted())
+        {
+            ImageUtils::DrawText(100, 5, COLOR_TURQUOISE, String("sdcard:") + (int)(sdCard->GetFreeSpaceInBytes() / 1024 / 1024) + "MB", _backRgbBuffer);
+        }
     }
 
     if (fb != nullptr)
