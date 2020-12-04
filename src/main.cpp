@@ -69,7 +69,7 @@ void loop()
     if (frame != nullptr)
     {
         Serial.println("Auswertung");
-        int left = 18;
+        int left = 17;
         int stepSize = 37;
         float minConf = 1.0;
         float kwh = 0;
