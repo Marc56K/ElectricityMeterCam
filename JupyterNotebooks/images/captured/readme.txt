@@ -1,0 +1,1 @@
+put your captured camera jpgs in this folder

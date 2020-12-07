@@ -3,9 +3,10 @@
 
 constexpr int tensor_pool_size = 64 * 1024;
 
-OCR::OCR(const void* model, const int inputWidth, const int inputHeight) :
+OCR::OCR(const void* model, const int inputWidth, const int inputHeight, const int outputClasses) :
     _inputWidth(inputWidth),
     _inputHeight(inputHeight),
+    _outputClasses(outputClasses),
     _interpreter(nullptr),
     _input(nullptr),
     _output(nullptr)
@@ -84,10 +85,10 @@ int OCR::PredictDigit(const dl_matrix3du_t* frame, const int rectX, const int re
 
     float bestConf = 0.0;
     int bestMatch = -1;
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < _outputClasses; i++)
     {        
         Serial.print(String("[") + i + "](" + (int)round(_output->data.f[i] * 100) + "%) ");
-        if (_output->data.f[i] > bestConf)
+        if (i < 10 && _output->data.f[i] > bestConf)
         {
             bestConf = _output->data.f[i];
             bestMatch = i;

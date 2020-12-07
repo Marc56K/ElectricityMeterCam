@@ -3,15 +3,16 @@
 #include "ImageUtils.h"
 #include "esp_http_server.h"
 #include "camera_pins.h"
+#include <sstream>
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 httpd_handle_t httpServer = nullptr;
-SemaphoreHandle_t bufferSemaphore = xSemaphoreCreateMutex();
+SemaphoreHandle_t httpSemaphore = xSemaphoreCreateMutex();
 dl_matrix3du_t* httpFrontRgbBuffer = nullptr;
-float latestKwhValue = 0;
+KwhInfo latestKwhInfo = {};
 
 static esp_err_t HttpGet_CameraStreamHandler(httpd_req_t *req)
 {
@@ -35,7 +36,7 @@ static esp_err_t HttpGet_CameraStreamHandler(httpd_req_t *req)
         }
         else
         {
-            xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
+            xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
             {
                 Serial.println("Compressing RGB to JPEG");
                 static uint32_t imgIdx = 0;
@@ -57,7 +58,7 @@ static esp_err_t HttpGet_CameraStreamHandler(httpd_req_t *req)
                     res = ESP_FAIL;
                 }
             }
-            xSemaphoreGiveRecursive(bufferSemaphore);
+            xSemaphoreGiveRecursive(httpSemaphore);
         }
 
         if (res == ESP_OK)
@@ -95,8 +96,17 @@ static esp_err_t HttpGet_CameraStreamHandler(httpd_req_t *req)
 
 static esp_err_t HttpGet_KwhHandler(httpd_req_t *req)
 {
-    String str(latestKwhValue);
+    String str;
+    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+    {
+        str += String(latestKwhInfo.kwh, 1);
+        str += " ";
+        str += latestKwhInfo.confidence;
+    }
+    xSemaphoreGiveRecursive(httpSemaphore);
+
     httpd_resp_send(req, str.c_str(), str.length());
+
     return ESP_OK;
 }
 
@@ -226,12 +236,12 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
         memset(_backRgbBuffer->item, 255, _backRgbBuffer->stride * _backRgbBuffer->h);
     }
 
-    xSemaphoreTakeRecursive(bufferSemaphore, portMAX_DELAY);
+    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
     {
         std::swap(_frontRgbBuffer, _backRgbBuffer);
         httpFrontRgbBuffer = _frontRgbBuffer;
     }
-    xSemaphoreGiveRecursive(bufferSemaphore);
+    xSemaphoreGiveRecursive(httpSemaphore);
 
     bool rgbValid = true;
     if (!fmt2rgb888(fb->buf, fb->len, fb->format, _backRgbBuffer->item))
@@ -264,7 +274,11 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
     return _backRgbBuffer;
 }
 
-void CameraServer::SetLatestKwh(float kwh)
+void CameraServer::SetLatestKwh(const KwhInfo& info)
 {
-    latestKwhValue = kwh;
+    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+    {
+        latestKwhInfo = info;
+    }
+    xSemaphoreGiveRecursive(httpSemaphore);
 }

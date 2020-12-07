@@ -9,9 +9,9 @@
 
 #define LED_PIN 4
 
-//OCR ocr(ocr_model_22x32_tflite, 22, 32);
 SDCard sdCard;
-OCR ocr(ocr_model_28x28_tflite, 28, 28);
+//OCR ocr(ocr_model_28x28_tflite, 28, 28, 10);
+OCR ocr(ocr_model_28x28_c11_tflite, 28, 28, 11);
 CameraServer camServer;
 
 void setup()
@@ -73,31 +73,32 @@ void loop()
         Serial.println("Auswertung");
         int left = 17;
         int stepSize = 37;
-        float minConf = 1.0;
-        float kwh = 0;
-        float confidence = 0;
+        KwhInfo info = {};
+        info.kwh = 0;
+        info.confidence = 1.0;
+        float conf = 0;
         for (int i = 0; i < 7; i++)
         {
             switch(i){
             case 0 ... 1:
-                digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &confidence);
+                digit = DetectDigit(frame, left + stepSize * i, 132, 30, 42, &conf);
                 break;        
             case 2 ... 3:
-                digit = DetectDigit(frame, left + (stepSize+1) * i, 134, 30, 42, &confidence);        
+                digit = DetectDigit(frame, left + (stepSize+1) * i, 134, 30, 42, &conf);        
                 break;
             case 4 ... 6:
-                digit = DetectDigit(frame, left + (stepSize+1) * i, 135, 30, 42, &confidence);
+                digit = DetectDigit(frame, left + (stepSize+1) * i, 135, 30, 42, &conf);
             default:
                 break;
             }
-            minConf = std::min(confidence, minConf);
-            kwh += pow(10, 5 - i) * digit;
+            info.confidence = std::min(conf, info.confidence);
+            info.kwh += pow(10, 5 - i) * digit;
         }
+        
+        camServer.SetLatestKwh(info);
 
-        camServer.SetLatestKwh(kwh);
-
-        Serial.println(String("VALUE: ") + kwh + " kWh (" + (minConf * 100) + "%)");
-        sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + kwh + "\t" + minConf);
+        Serial.println(String("VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
+        sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + info.kwh + "\t" + info.confidence);
     }
 
     if (millis() < 300000) // more frequent updates in first 5 minutes

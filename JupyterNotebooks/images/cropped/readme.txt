@@ -1,0 +1,1 @@
+ImageCutter is putting the cropped digits in this folder.

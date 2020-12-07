@@ -4,6 +4,12 @@
 #include "fb_gfx.h"
 #include "fr_forward.h"
 
+struct KwhInfo
+{
+    float kwh;
+    float confidence;
+};
+
 class CameraServer
 {
 public:
@@ -14,7 +20,7 @@ public:
     bool InitCamera(const bool flipImage);
     dl_matrix3du_t* CaptureFrame(SDCard* sdCard = nullptr);
 
-    void SetLatestKwh(float kwh);
+    void SetLatestKwh(const KwhInfo& info);
 
 private:
     dl_matrix3du_t* _frontRgbBuffer;

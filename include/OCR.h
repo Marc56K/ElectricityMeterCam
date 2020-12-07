@@ -9,7 +9,7 @@
 class OCR
 {
 public:
-    OCR(const void* model, const int inputWidth, const int inputHeight);
+    OCR(const void* model, const int inputWidth, const int inputHeight, const int outputClasses);
     ~OCR();
 
     int PredictDigit(
@@ -23,6 +23,7 @@ public:
 private:
     int _inputWidth;
     int _inputHeight;
+    int _outputClasses;
     uint8_t* _tensorMemoryPool = nullptr;
     const tflite::Model* _model;
     tflite::MicroInterpreter* _interpreter;
