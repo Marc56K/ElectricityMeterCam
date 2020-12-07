@@ -22,10 +22,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("starting ...");
 
-    if (sdCard.Init())
-    {
-        Serial.println("SD-Card connected");
-    }
+    sdCard.Mount();
 
     WifiHelper::Connect();
 
@@ -56,6 +53,12 @@ void warten(unsigned long milisec)
 
 void loop()
 {
+    if (sdCard.IsMounted() && !sdCard.IsWritable())
+    {
+        Serial.println("SD card is readonly or disconnected.");
+        sdCard.Unmount();
+    }
+
     int digit = 0;
     Serial.println("LEDs an");
     digitalWrite(LED_PIN, HIGH);
@@ -64,7 +67,6 @@ void loop()
     auto* frame = camServer.CaptureFrame(&sdCard);    
     Serial.println("LEDs aus");
     digitalWrite(LED_PIN, LOW);
-    //Serial.println("Auswertung");
     
     if (frame != nullptr)
     {
@@ -97,7 +99,14 @@ void loop()
         Serial.println(String("VALUE: ") + kwh + " kWh (" + (minConf * 100) + "%)");
         sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + kwh + "\t" + minConf);
     }
-    //Serial.println("warte 60 Sekunden");
-    warten(60000);
+
+    if (millis() < 300000) // more frequent updates in first 5 minutes
+    {
+        warten(500);
+    }
+    else
+    {
+        warten(60000);
+    }    
 
 }
