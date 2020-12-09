@@ -96,7 +96,11 @@ void loop()
             info.kwh += pow(10, 5 - i) * digit;
         }
         
+        // send result to http://esp32cam/kwh/ endpoint
         camServer.SetLatestKwh(info);
+
+        // send frame to http://esp32cam/ endpoint
+        camServer.SwapBuffers();
 
         Serial.println(String("VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
         sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + info.kwh + "\t" + info.confidence);

@@ -240,13 +240,6 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
         memset(_backRgbBuffer->item, 255, _backRgbBuffer->stride * _backRgbBuffer->h);
     }
 
-    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
-    {
-        std::swap(_frontRgbBuffer, _backRgbBuffer);
-        httpFrontRgbBuffer = _frontRgbBuffer;
-    }
-    xSemaphoreGiveRecursive(httpSemaphore);
-
     bool rgbValid = true;
     if (!fmt2rgb888(fb->buf, fb->len, fb->format, _backRgbBuffer->item))
     {
@@ -281,6 +274,16 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
     }
 
     return _backRgbBuffer;
+}
+
+void CameraServer::SwapBuffers()
+{
+    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+    {
+        std::swap(_frontRgbBuffer, _backRgbBuffer);
+        httpFrontRgbBuffer = _frontRgbBuffer;
+    }
+    xSemaphoreGiveRecursive(httpSemaphore);
 }
 
 void CameraServer::SetLatestKwh(const KwhInfo& info)

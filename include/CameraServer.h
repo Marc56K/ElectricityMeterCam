@@ -18,8 +18,10 @@ public:
 
     bool StartServer();
     bool InitCamera(const bool flipImage);
-    dl_matrix3du_t* CaptureFrame(SDCard* sdCard = nullptr);
 
+    dl_matrix3du_t* CaptureFrame(SDCard* sdCard = nullptr);
+    void SwapBuffers();
+    
     void SetLatestKwh(const KwhInfo& info);
 
 private:
