@@ -233,11 +233,17 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
 
     if (_backRgbBuffer == nullptr)
     {
-        _frontRgbBuffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
-        memset(_frontRgbBuffer->item, 255, _frontRgbBuffer->stride * _frontRgbBuffer->h);
-
         _backRgbBuffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
         memset(_backRgbBuffer->item, 255, _backRgbBuffer->stride * _backRgbBuffer->h);
+
+        _frontRgbBuffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
+        memset(_frontRgbBuffer->item, 255, _frontRgbBuffer->stride * _frontRgbBuffer->h);        
+        ImageUtils::DrawText(5, 5, COLOR_RED, String("stay tuned ..."), _frontRgbBuffer);
+        xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+        {
+            httpFrontRgbBuffer = _frontRgbBuffer;
+        }
+        xSemaphoreGiveRecursive(httpSemaphore);
     }
 
     bool rgbValid = true;

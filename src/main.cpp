@@ -8,6 +8,7 @@
 #include "OCR.h"
 
 #define LED_PIN 4
+#define MIN_CONFIDENCE 0.4f
 
 SDCard sdCard;
 //OCR ocr(ocr_model_28x28_tflite, 28, 28, 10);
@@ -40,7 +41,7 @@ void setup()
 int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height, float* confidence)
 {
     int digit = ocr.PredictDigit(frame, x, y, width, height, confidence);
-    uint32_t color = ImageUtils::GetColorFromConfidence(*confidence, 0.4f, 1.0f);
+    uint32_t color = ImageUtils::GetColorFromConfidence(*confidence, MIN_CONFIDENCE, 1.0f);
     ImageUtils::DrawRect(x, y, width, height, color, frame);
     ImageUtils::DrawFillRect(x, y - 4, width * (*confidence), 4, color, frame);
     ImageUtils::DrawText(x + width / 5, y + height, color, String(digit), frame);
@@ -95,6 +96,9 @@ void loop()
             info.confidence = std::min(conf, info.confidence);
             info.kwh += pow(10, 5 - i) * digit;
         }
+
+        uint32_t color = ImageUtils::GetColorFromConfidence(info.confidence, MIN_CONFIDENCE, 1.0f);
+        ImageUtils::DrawText(180, 5, color, String("conf:") +  (int)(info.confidence * 100) + "%", frame);
         
         // send result to http://esp32cam/kwh/ endpoint
         camServer.SetLatestKwh(info);
