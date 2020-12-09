@@ -112,7 +112,9 @@ static esp_err_t HttpGet_KwhHandler(httpd_req_t *req)
 
 CameraServer::CameraServer() :
     _frontRgbBuffer(nullptr),
-    _backRgbBuffer(nullptr)
+    _backRgbBuffer(nullptr),
+    _numCapturedFrames(0),
+    _numStoredFrames(0)
 {
 }
 
@@ -209,13 +211,14 @@ bool CameraServer::InitCamera(const bool flipImage)
 
 dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
 {
-    static uint32_t frameIdx = 0;
     camera_fb_t *fb = esp_camera_fb_get();
     if (fb == nullptr)
     {
         Serial.println("Camera capture failed");
         return nullptr;
     }
+
+    _numCapturedFrames++;
 
     if (sdCard != nullptr && sdCard->IsMounted())
     {
@@ -224,6 +227,7 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
         {
             file.write(fb->buf, fb->len);
             file.close();
+            _numStoredFrames++;
         }
     }
 
@@ -251,11 +255,18 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
     }
     else
     {
-        ImageUtils::DrawText(5, 5, COLOR_TURQUOISE, String("") + frameIdx, _backRgbBuffer);
-        
+        // frame number in upper left corner
+        ImageUtils::DrawText(5, 5, COLOR_RED, String("") + _numCapturedFrames, _backRgbBuffer);
+
+        // sd card infos on the bottom
         if (sdCard != nullptr && sdCard->IsMounted())
         {
-            ImageUtils::DrawText(100, 5, COLOR_TURQUOISE, String("sdcard:") + (int)(sdCard->GetFreeSpaceInBytes() / 1024 / 1024) + "MB", _backRgbBuffer);
+            ImageUtils::DrawText(150, 210, COLOR_TURQUOISE, String("SD:") + (int)(sdCard->GetFreeSpaceInBytes() / 1024 / 1024) + "MB", _backRgbBuffer);
+        }
+
+        if (_numStoredFrames > 0)
+        {
+            ImageUtils::DrawText(5, 210, COLOR_TURQUOISE, String("#imgs:") + _numStoredFrames, _backRgbBuffer);
         }
     }
 
@@ -263,8 +274,6 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
     {
         esp_camera_fb_return(fb);
     }
-
-    frameIdx++;
 
     if (!rgbValid)
     {

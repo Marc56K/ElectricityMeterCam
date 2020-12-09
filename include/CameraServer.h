@@ -25,4 +25,6 @@ public:
 private:
     dl_matrix3du_t* _frontRgbBuffer;
     dl_matrix3du_t* _backRgbBuffer;
+    uint32_t _numCapturedFrames;
+    uint32_t _numStoredFrames;
 };
