@@ -8,6 +8,7 @@ struct KwhInfo
 {
     float kwh;
     float confidence;
+    int unixtime;
 };
 
 class CameraServer

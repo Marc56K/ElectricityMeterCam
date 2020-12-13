@@ -256,7 +256,7 @@ dl_matrix3du_t* CameraServer::CaptureFrame(SDCard* sdCard)
     {
         // frame number in upper left corner
         ImageUtils::DrawText(5, 5, COLOR_RED, String("") + _numCapturedFrames, _backRgbBuffer);
-
+        
         // sd card infos on the bottom
         if (sdCard != nullptr && sdCard->IsMounted())
         {

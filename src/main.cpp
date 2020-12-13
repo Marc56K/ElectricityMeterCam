@@ -2,6 +2,7 @@
 #include "soc/soc.h"          //disable brownout problems
 #include "soc/rtc_cntl_reg.h" //disable brownout problems
 
+#include "NTPClient.h"
 #include "SDCard.h"
 #include "CameraServer.h"
 #include "WifiHelper.h"
@@ -14,6 +15,9 @@ SDCard sdCard;
 //OCR ocr(ocr_model_28x28_tflite, 28, 28, 10);
 OCR ocr(ocr_model_28x28_c11_tflite, 28, 28, 11);
 CameraServer camServer;
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600);
 
 void setup()
 {
@@ -36,6 +40,7 @@ void setup()
 
         Serial.println("started");
     }
+    timeClient.begin();
 }
 
 int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width, const int height, float* confidence)
@@ -55,6 +60,10 @@ void warten(unsigned long milisec)
 
 void loop()
 {
+    timeClient.update();
+    String zeit = timeClient.getFormattedTime();
+    //timeClient.getEpochTime();
+    //timeClient.getFormattedTime();
     if (sdCard.IsMounted() && !sdCard.IsWritable())
     {
         Serial.println("SD card is readonly or disconnected.");
@@ -96,18 +105,20 @@ void loop()
             info.confidence = std::min(conf, info.confidence);
             info.kwh += pow(10, 5 - i) * digit;
         }
+        
+        info.unixtime = timeClient.getEpochTime();
 
         uint32_t color = ImageUtils::GetColorFromConfidence(info.confidence, MIN_CONFIDENCE, 1.0f);
         ImageUtils::DrawText(180, 5, color, String("conf:") +  (int)(info.confidence * 100) + "%", frame);
+        ImageUtils::DrawText(5, 35, COLOR_TURQUOISE, String("") + zeit, frame);
         
         // send result to http://esp32cam/kwh/ endpoint
         camServer.SetLatestKwh(info);
 
         // send frame to http://esp32cam/ endpoint
         camServer.SwapBuffers();
-
-        Serial.println(String("VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
-        sdCard.WriteToFile("/kwh.csv", String("") + millis() + "\t" + info.kwh + "\t" + info.confidence);
+        Serial.println(String("Zeit: ")+ zeit + String("VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
+        sdCard.WriteToFile("/kwh.csv", String("") + info.unixtime + "\t" + info.kwh + "\t" + info.confidence);
     }
 
     if (millis() < 300000) // more frequent updates in first 5 minutes
