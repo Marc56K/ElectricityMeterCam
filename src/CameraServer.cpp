@@ -99,6 +99,8 @@ static esp_err_t HttpGet_KwhHandler(httpd_req_t *req)
     String str;
     xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
     {
+        str += latestKwhInfo.unixtime;
+        str += " ";
         str += String(latestKwhInfo.kwh, 1);
         str += " ";
         str += latestKwhInfo.confidence;
