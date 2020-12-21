@@ -60,6 +60,9 @@ void warten(unsigned long milisec)
 
 void loop()
 {
+    if (!WiFi.isConnected()){
+        WifiHelper::Connect();
+    }
     timeClient.update();
     String zeit = timeClient.getFormattedTime();
     //timeClient.getEpochTime();
