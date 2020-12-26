@@ -133,4 +133,10 @@ void loop()
         warten(60000);
     }    
 
+    if (millis() > 24 * 60 * 60 * 1000) // restart esp after 24 hours
+    {
+        Serial.println("Restart");
+        Serial.flush();
+        ESP.restart();
+    }
 }
