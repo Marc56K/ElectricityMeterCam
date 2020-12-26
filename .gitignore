@@ -11,3 +11,5 @@ JupyterNotebooks/.ipynb_checkpoints
 JupyterNotebooks/images/captured/*.jpg
 JupyterNotebooks/images/cropped/*.png
 JupyterNotebooks/images/labeled
+*.csv
+*.idx
