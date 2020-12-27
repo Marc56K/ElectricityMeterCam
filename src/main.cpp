@@ -58,27 +58,36 @@ void warten(unsigned long milisec)
     vTaskDelay(milisec * portTICK_PERIOD_MS);
 }
 
-void loop()
+void updateConnections()
 {
-    if (!WiFi.isConnected()){
+    if (!WiFi.isConnected())
+    {
         WifiHelper::Connect();
     }
-    timeClient.update();
-    String zeit = timeClient.getFormattedTime();
-    //timeClient.getEpochTime();
-    //timeClient.getFormattedTime();
+
     if (sdCard.IsMounted() && !sdCard.IsWritable())
     {
         Serial.println("SD card is readonly or disconnected.");
         sdCard.Unmount();
     }
 
+    timeClient.update();
+}
+
+void loop()
+{
+    updateConnections();
+
+    KwhInfo info = {};    
+    info.unixtime = timeClient.getEpochTime();
+    const String time = timeClient.getFormattedTime();
+
     int digit = 0;
     Serial.println("LEDs an");
     digitalWrite(LED_PIN, HIGH);
     warten(1000);
     Serial.println("Bild holen");
-    auto* frame = camServer.CaptureFrame(&sdCard);    
+    auto* frame = camServer.CaptureFrame(info.unixtime, &sdCard);    
     Serial.println("LEDs aus");
     digitalWrite(LED_PIN, LOW);
     
@@ -87,7 +96,7 @@ void loop()
         Serial.println("Auswertung");
         int left = 17;
         int stepSize = 37;
-        KwhInfo info = {};
+        
         info.kwh = 0;
         info.confidence = 1.0;
         float conf = 0;
@@ -109,18 +118,16 @@ void loop()
             info.kwh += pow(10, 5 - i) * digit;
         }
         
-        info.unixtime = timeClient.getEpochTime();
-
         uint32_t color = ImageUtils::GetColorFromConfidence(info.confidence, MIN_CONFIDENCE, 1.0f);
-        ImageUtils::DrawText(180, 5, color, String("conf:") +  (int)(info.confidence * 100) + "%", frame);
-        ImageUtils::DrawText(5, 35, COLOR_TURQUOISE, String("") + zeit, frame);
+        ImageUtils::DrawText(120, 5, color, String("") +  (int)(info.confidence * 100) + "%", frame);
+        ImageUtils::DrawText(190, 5, COLOR_TURQUOISE, String("") + time, frame);
         
         // send result to http://esp32cam/kwh/ endpoint
         camServer.SetLatestKwh(info);
 
         // send frame to http://esp32cam/ endpoint
         camServer.SwapBuffers();
-        Serial.println(String("Zeit: ")+ zeit + String("VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
+        Serial.println(String("Time: ") + time + String(" VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
         sdCard.WriteToFile("/kwh.csv", String("") + info.unixtime + "\t" + info.kwh + "\t" + info.confidence);
     }
 

@@ -8,7 +8,7 @@ struct KwhInfo
 {
     float kwh;
     float confidence;
-    int unixtime;
+    unsigned long unixtime;
 };
 
 class CameraServer
@@ -20,7 +20,7 @@ public:
     bool StartServer();
     bool InitCamera(const bool flipImage);
 
-    dl_matrix3du_t* CaptureFrame(SDCard* sdCard = nullptr);
+    dl_matrix3du_t* CaptureFrame(const unsigned long timestamp, SDCard* sdCard = nullptr);
     void SwapBuffers();
     
     void SetLatestKwh(const KwhInfo& info);

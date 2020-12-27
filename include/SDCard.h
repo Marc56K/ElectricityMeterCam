@@ -15,7 +15,7 @@ public:
     bool IsWritable();
     uint64_t GetFreeSpaceInBytes();
     bool WriteToFile(const String& filePath, const String& line, const bool append = true);
-    bool CreateNextFile(const String& dir, const String& name, File& file);
+    bool OpenFileForWriting(const String& filePath, File& file);
 
 private:
     bool _mounted;
