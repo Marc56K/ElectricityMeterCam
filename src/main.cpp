@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <iomanip>
+#include <sstream>
 #include "soc/soc.h"          //disable brownout problems
 #include "soc/rtc_cntl_reg.h" //disable brownout problems
 #include "NTPClient.h"
@@ -12,8 +14,8 @@
 #define LED_PIN 4
 #define MIN_CONFIDENCE 0.4f
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
 
 SDCard sdCard;
 //OCR ocr(ocr_model_28x28_tflite, 28, 28, 10);
@@ -33,54 +35,73 @@ int DetectDigit(dl_matrix3du_t* frame, const int x, const int y, const int width
     return digit;
 }
 
-void warten(unsigned long milisec)
+KwhInfo AnalyzeFrame(dl_matrix3du_t* frame, const unsigned long unixtime)
+{
+    KwhInfo info = {};
+    info.kwh = 0;
+    info.confidence = 1.0;
+    info.unixtime = unixtime;
+    const String time = timeClient.getFormattedTime();
+    
+    const int left = 19;
+    const int stepSize = 37;
+    float conf = 0;
+    int digit = 0;
+    for (int i = 0; i < 7; i++)
+    {
+        switch(i){
+        case 0 ... 1:
+            digit = DetectDigit(frame, left + stepSize * i, 112, 30, 42, &conf);
+            break;        
+        case 2 ... 3:
+            digit = DetectDigit(frame, left + (stepSize+2) * i, 111, 30, 42, &conf);        
+            break;
+        case 4 ... 6:
+            digit = DetectDigit(frame, left + (stepSize+1) * i, 108, 30, 42, &conf);
+        default:
+            break;
+        }
+        info.confidence = std::min(conf, info.confidence);
+        info.kwh += pow(10, 5 - i) * digit;
+    }
+
+    uint32_t color = ImageUtils::GetColorFromConfidence(info.confidence, MIN_CONFIDENCE, 1.0f);
+    ImageUtils::DrawText(120, 5, color, String("") +  (int)(info.confidence * 100) + "%", frame);
+    ImageUtils::DrawText(190, 5, COLOR_TURQUOISE, String("") + time, frame);
+
+    Serial.println(String("Time: ") + time + String(" VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
+
+    return info;
+}
+
+void taskDelay(unsigned long milisec)
 {
     vTaskDelay(milisec * portTICK_PERIOD_MS);
 }
 
-void mqttconnect() {
-  if (!client.connected()){
-  // Loop until we're reconnected
-    //bboot = true;
-    while (!client.connected()) {
-      Serial.print("Attempting MQTT connection...");
-      // Attempt to connect
-      if (client.connect("metercam",USER,PASS)) {
-        Serial.println("connected");
-        // Subscribe
-        //client.subscribe("metercam/");
-        //Serial.println("subscribed to topic </>");
-        //warten(100);
-      } else {
-        Serial.print("failed, rc=");
-        Serial.print(client.state());
-        Serial.println(" try again in 5 seconds");
-        // Wait 5 seconds before retrying
-        warten(5000);
-      }
-    }
-  }
-}
-
-void callback(char* topic, byte* message, unsigned int length)
+void mqttUpdate()
 {
-  Serial.print("Message arrived on topic: <");
-  Serial.print(topic);
-  Serial.print("> Message: ");
-  String messageTemp = "";
-  
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)message[i]);
-    messageTemp += (char)message[i];
-  }
-  Serial.println();
- 
-  if (String(topic) == "metercam/") {
-    if (messageTemp == "value"){
-      //client.publish("");
-      Serial.println("doing something");
+    if (strlen(CLOUD) > 0)
+    {
+        for (int i = 0; i < 5 && !mqttClient.connected(); ++i)
+        {
+            Serial.print("Attempting MQTT connection...");
+            // Attempt to connect
+            if (mqttClient.connect("metercam", USER, PASS))
+            {
+                Serial.println("connected");
+            }
+            else
+            {
+                Serial.print("failed, rc=");
+                Serial.print(mqttClient.state());
+                Serial.println(" try again in 1 seconds");
+                taskDelay(1000);
+            }
+        }
+
+        mqttClient.loop();
     }
-  }
 }
 
 void updateConnections()
@@ -97,73 +118,8 @@ void updateConnections()
     }
 
     timeClient.update();
-    mqttconnect();
-    client.loop();
+    mqttUpdate();
 }
-
-// C program for implementation of ftoa() 
-#include <math.h> 
-#include <stdio.h> 
-
-// Reverses a string 'str' of length 'len' 
-void reverse(char* str, int len) 
-{ 
-	int i = 0, j = len - 1, temp; 
-	while (i < j) { 
-		temp = str[i]; 
-		str[i] = str[j]; 
-		str[j] = temp; 
-		i++; 
-		j--; 
-	} 
-} 
-
-// Converts a given integer x to string str[]. 
-// d is the number of digits required in the output. 
-// If d is more than the number of digits in x, 
-// then 0s are added at the beginning. 
-int intToStr(int x, char str[], int d) 
-{ 
-	int i = 0; 
-	while (x) { 
-		str[i++] = (x % 10) + '0'; 
-		x = x / 10; 
-	} 
-
-	// If number of digits required is more, then 
-	// add 0s at the beginning 
-	while (i < d) 
-		str[i++] = '0'; 
-
-	reverse(str, i); 
-	str[i] = '\0'; 
-	return i; 
-} 
-
-// Converts a floating-point/double number to a string. 
-void ftoa(float n, char* res, int afterpoint) 
-{ 
-	// Extract integer part 
-	int ipart = (int)n; 
-
-	// Extract floating part 
-	float fpart = n - (float)ipart; 
-
-	// convert integer part to string 
-	int i = intToStr(ipart, res, 0); 
-
-	// check for display option after point 
-	if (afterpoint != 0) { 
-		res[i] = '.'; // add dot 
-
-		// Get the value of fraction part upto given no. 
-		// of points after dot. The third parameter 
-		// is needed to handle cases like 233.007 
-		fpart = fpart * pow(10, afterpoint); 
-
-		intToStr((int)fpart, res + i + 1, afterpoint); 
-	} 
-} 
 
 void setup()
 {
@@ -186,84 +142,55 @@ void setup()
 
         Serial.println("started");
     }
-    timeClient.begin();
-    client.setServer(CLOUD, 1883);
-    client.setCallback(callback);
-}
 
+    timeClient.begin();
+    mqttClient.setServer(CLOUD, 1883);
+}
 
 void loop()
 {
     updateConnections();
-    
-    KwhInfo info = {};    
-    info.unixtime = timeClient.getEpochTime();
-    const String time = timeClient.getFormattedTime();
 
-    int digit = 0;
+    const unsigned long unixtime = timeClient.getEpochTime();
+    
     Serial.println("LEDs an");
     digitalWrite(LED_PIN, HIGH);
-    warten(1000);
+    taskDelay(1000);
     Serial.println("Bild holen");
-    auto* frame = camServer.CaptureFrame(info.unixtime, &sdCard);    
+    auto* frame = camServer.CaptureFrame(unixtime, &sdCard);    
     Serial.println("LEDs aus");
     digitalWrite(LED_PIN, LOW);
     
     if (frame != nullptr)
     {
         Serial.println("Auswertung");
-        int left = 19;
-        int stepSize = 37;
-        
-        info.kwh = 0;
-        info.confidence = 1.0;
-        float conf = 0;
-        for (int i = 0; i < 7; i++)
-        {
-            switch(i){
-            case 0 ... 1:
-                digit = DetectDigit(frame, left + stepSize * i, 112, 30, 42, &conf);
-                break;        
-            case 2 ... 3:
-                digit = DetectDigit(frame, left + (stepSize+2) * i, 111, 30, 42, &conf);        
-                break;
-            case 4 ... 6:
-                digit = DetectDigit(frame, left + (stepSize+1) * i, 108, 30, 42, &conf);
-            default:
-                break;
-            }
-            info.confidence = std::min(conf, info.confidence);
-            info.kwh += pow(10, 5 - i) * digit;
-        }
-        
-        uint32_t color = ImageUtils::GetColorFromConfidence(info.confidence, MIN_CONFIDENCE, 1.0f);
-        ImageUtils::DrawText(120, 5, color, String("") +  (int)(info.confidence * 100) + "%", frame);
-        ImageUtils::DrawText(190, 5, COLOR_TURQUOISE, String("") + time, frame);
+        KwhInfo info = AnalyzeFrame(frame, unixtime);
         
         // send result to http://esp32cam/kwh/ endpoint
         camServer.SetLatestKwh(info);
 
         // send frame to http://esp32cam/ endpoint
         camServer.SwapBuffers();
-        Serial.println(String("Time: ") + time + String(" VALUE: ") + info.kwh + " kWh (" + (info.confidence * 100) + "%)");
+        
         sdCard.WriteToFile("/kwh.csv", String("") + info.unixtime + "\t" + info.kwh + "\t" + info.confidence);
-    }
 
-    char tempString[20];
-    itoa(info.confidence * 100, tempString,10);
-    client.publish("metercam/confidence", tempString);
-    if (info.confidence > 0.9){
-    ftoa(info.kwh, tempString, 2);
-    client.publish("metercam/metervalue", tempString);
+        // send tp MQTT server
+        mqttClient.publish("metercam/confidence", String(info.confidence * 100).c_str());
+        if (info.confidence > 0.9)
+        {
+            std::stringstream ss;
+            ss << std::fixed << std::setprecision(1) << info.kwh;
+            mqttClient.publish("metercam/metervalue", ss.str().c_str());
+        }
     }
 
     if (millis() < 300000) // more frequent updates in first 5 minutes
     {
-        warten(500);
+        taskDelay(500);
     }
     else
     {
-        warten(60000);
+        taskDelay(60000);
     }    
 
     if (millis() > 24 * 60 * 60 * 1000) // restart esp after 24 hours

@@ -1,2 +1,5 @@
 #define WIFI_SSID "xxx"
 #define WIFI_KEY "xxx"
+#define CLOUD ""
+#define USER ""
+#define PASS ""
