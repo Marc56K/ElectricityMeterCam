@@ -1,6 +1,4 @@
 #include <Arduino.h>
-#include <iomanip>
-#include <sstream>
 #include "soc/soc.h"          //disable brownout problems
 #include "soc/rtc_cntl_reg.h" //disable brownout problems
 #include "NTPClient.h"
@@ -175,12 +173,10 @@ void loop()
         sdCard.WriteToFile("/kwh.csv", String("") + info.unixtime + "\t" + info.kwh + "\t" + info.confidence);
 
         // send tp MQTT server
-        mqttClient.publish("metercam/confidence", String(info.confidence * 100).c_str());
+        mqttClient.publish("metercam/confidence", String(info.confidence * 100, 0).c_str());
         if (info.confidence > 0.9)
         {
-            std::stringstream ss;
-            ss << std::fixed << std::setprecision(1) << info.kwh;
-            mqttClient.publish("metercam/metervalue", ss.str().c_str());
+            mqttClient.publish("metercam/metervalue", String(info.kwh, 1).c_str());
         }
     }
 
