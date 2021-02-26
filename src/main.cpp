@@ -253,7 +253,7 @@ void loop()
     itoa(info.confidence * 100, tempString,10);
     client.publish("metercam/confidence", tempString);
     if (info.confidence > 0.9){
-    ftoa(info.kwh, tempString,1);
+    ftoa(info.kwh, tempString, 2);
     client.publish("metercam/metervalue", tempString);
     }
 
