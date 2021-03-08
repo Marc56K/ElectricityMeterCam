@@ -25,8 +25,12 @@
 #include <Arduino.h>
 #include "fb_gfx.h"
 #include "fr_forward.h"
+#ifdef min
 #undef min
+#endif
+#ifdef max
 #undef max
+#endif
 
 #define COLOR_WHITE     0x00FFFFFF
 #define COLOR_BLACK     0x00000000
