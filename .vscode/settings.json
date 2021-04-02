@@ -42,6 +42,8 @@
         "cinttypes": "cpp",
         "utility": "cpp",
         "typeinfo": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "string": "cpp",
+        "*.html": "cpp"
     }
 }

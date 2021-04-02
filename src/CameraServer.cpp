@@ -21,131 +21,30 @@
  */
 
 #include "CameraServer.h"
-#include <Arduino.h>
-#include "ImageUtils.h"
-#include "esp_http_server.h"
-#include "camera_pins.h"
-#include <sstream>
+#include "index.h.html"
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
-httpd_handle_t httpServer = nullptr;
-SemaphoreHandle_t httpSemaphore = xSemaphoreCreateMutex();
-dl_matrix3du_t* httpFrontRgbBuffer = nullptr;
-KwhInfo latestKwhInfo = {};
 
-static esp_err_t HttpGet_CameraStreamHandler(httpd_req_t *req)
-{
-    esp_err_t res = ESP_OK;
-    size_t _jpg_buf_len = 0;
-    uint8_t *_jpg_buf = nullptr;
-    char *part_buf[64];
-
-    res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
-    if (res != ESP_OK)
-    {
-        return res;
-    }
-
-    while (true)
-    {
-        if (httpFrontRgbBuffer == nullptr)
-        {
-            Serial.println("Camera capture failed");
-            res = ESP_FAIL;
-        }
-        else
-        {
-            xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
-            {
-                Serial.println("Compressing RGB to JPEG");
-                static uint32_t imgIdx = 0;
-                imgIdx++;
-
-                ImageUtils::DrawRect(
-                    0, 0, httpFrontRgbBuffer->w, httpFrontRgbBuffer->h,
-                    imgIdx % 2 == 0 ? COLOR_RED : COLOR_BLACK, httpFrontRgbBuffer);
-
-                if (!fmt2jpg(
-                        httpFrontRgbBuffer->item, 
-                        httpFrontRgbBuffer->stride * httpFrontRgbBuffer->h,
-                        httpFrontRgbBuffer->w,
-                        httpFrontRgbBuffer->h,
-                        PIXFORMAT_RGB888,
-                        80, &_jpg_buf, &_jpg_buf_len))
-                {
-                    Serial.println("JPEG compression failed");
-                    res = ESP_FAIL;
-                }
-            }
-            xSemaphoreGiveRecursive(httpSemaphore);
-        }
-
-        if (res == ESP_OK)
-        {
-            size_t hlen = snprintf((char *)part_buf, 64, _STREAM_PART, _jpg_buf_len);
-            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-        }
-
-        if (res == ESP_OK)
-        {
-            res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-        }
-
-        if (res == ESP_OK)
-        {
-            res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-        }
-
-        if (_jpg_buf)
-        {
-            free(_jpg_buf);
-            _jpg_buf = nullptr;
-        }
-
-        if (res != ESP_OK)
-        {
-            break;
-        }
-
-        //Serial.printf("MJPG: %uB\n", (uint32_t)(_jpg_buf_len));
-    }
-
-    return res;
-}
-
-static esp_err_t HttpGet_KwhHandler(httpd_req_t *req)
-{
-    String str;
-    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
-    {
-        str += latestKwhInfo.unixtime;
-        str += " ";
-        str += String(latestKwhInfo.kwh, 1);
-        str += " ";
-        str += latestKwhInfo.confidence;
-    }
-    xSemaphoreGiveRecursive(httpSemaphore);
-
-    httpd_resp_send(req, str.c_str(), str.length());
-
-    return ESP_OK;
-}
-
-CameraServer::CameraServer() :
+CameraServer::CameraServer(Settings& settings) :
+    _settings(settings),
     _frontRgbBuffer(nullptr),
     _backRgbBuffer(nullptr),
     _numCapturedFrames(0),
-    _numStoredFrames(0)
+    _numStoredFrames(0),
+    _httpServer(nullptr),
+    _httpFrontRgbBuffer(nullptr),
+    _lastUserInteraction(0)
 {
+    _httpSemaphore = xSemaphoreCreateMutex();
 }
 
 CameraServer::~CameraServer()
 {
-    if (httpServer != nullptr)
-        httpd_stop(httpServer);
+    if (_httpServer != nullptr)
+        httpd_stop(_httpServer);
 
     if (_frontRgbBuffer != nullptr)
         dl_matrix3du_free(_frontRgbBuffer);
@@ -161,25 +60,61 @@ bool CameraServer::StartServer()
     config.server_port = 80;
 
     Serial.printf("Starting http server on port: '%d'\n", config.server_port);
-    if (httpd_start(&httpServer, &config) == ESP_OK)
+    if (httpd_start(&_httpServer, &config) == ESP_OK)
     {
         httpd_uri_t indexUri = 
         {
             .uri = "/",
             .method = HTTP_GET,
-            .handler = HttpGet_CameraStreamHandler,
-            .user_ctx = nullptr
+            .handler = [](httpd_req_t *req) -> esp_err_t { return ((CameraServer*)req->user_ctx)->HttpGetIndex(req); },
+            .user_ctx = this
         };
-        httpd_register_uri_handler(httpServer, &indexUri);
+        httpd_register_uri_handler(_httpServer, &indexUri);
+
+        httpd_uri_t imageUri = 
+        {
+            .uri = "/image",
+            .method = HTTP_GET,
+            .handler = [](httpd_req_t *req) -> esp_err_t { return ((CameraServer*)req->user_ctx)->HttpGetImage(req); },
+            .user_ctx = this
+        };
+        httpd_register_uri_handler(_httpServer, &imageUri);
+
+        httpd_uri_t liveUri = 
+        {
+            .uri = "/live",
+            .method = HTTP_GET,
+            .handler = [](httpd_req_t *req) -> esp_err_t { return ((CameraServer*)req->user_ctx)->HttpGetLive(req); },
+            .user_ctx = this
+        };
+        httpd_register_uri_handler(_httpServer, &liveUri);
 
         httpd_uri_t kwhUri = 
         {
             .uri = "/kwh",
             .method = HTTP_GET,
-            .handler = HttpGet_KwhHandler,
-            .user_ctx = nullptr
+            .handler = [](httpd_req_t *req) -> esp_err_t { return ((CameraServer*)req->user_ctx)->HttpGetKwh(req); },
+            .user_ctx = this
         };
-        httpd_register_uri_handler(httpServer, &kwhUri);
+        httpd_register_uri_handler(_httpServer, &kwhUri);
+
+        httpd_uri_t getbboxesUri = 
+        {
+            .uri = "/getbboxes",
+            .method = HTTP_GET,
+            .handler = [](httpd_req_t *req) -> esp_err_t { return ((CameraServer*)req->user_ctx)->HttpGetBBoxes(req); },
+            .user_ctx = this
+        };
+        httpd_register_uri_handler(_httpServer, &getbboxesUri);
+
+        httpd_uri_t setbboxesUri = 
+        {
+            .uri = "/setbboxes",
+            .method = HTTP_POST,
+            .handler = [](httpd_req_t *req) -> esp_err_t { return ((CameraServer*)req->user_ctx)->HttpPostBBoxes(req); },
+            .user_ctx = this
+        };
+        httpd_register_uri_handler(_httpServer, &setbboxesUri);
 
         return true;
     }
@@ -263,11 +198,11 @@ dl_matrix3du_t* CameraServer::CaptureFrame(const unsigned long timestamp, SDCard
         _frontRgbBuffer = dl_matrix3du_alloc(1, fb->width, fb->height, 3);
         memset(_frontRgbBuffer->item, 255, _frontRgbBuffer->stride * _frontRgbBuffer->h);        
         ImageUtils::DrawText(5, 5, COLOR_RED, String("stay tuned ..."), _frontRgbBuffer);
-        xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+        xSemaphoreTakeRecursive(_httpSemaphore, portMAX_DELAY);
         {
-            httpFrontRgbBuffer = _frontRgbBuffer;
+            _httpFrontRgbBuffer = _frontRgbBuffer;
         }
-        xSemaphoreGiveRecursive(httpSemaphore);
+        xSemaphoreGiveRecursive(_httpSemaphore);
     }
 
     bool rgbValid = true;
@@ -308,19 +243,214 @@ dl_matrix3du_t* CameraServer::CaptureFrame(const unsigned long timestamp, SDCard
 
 void CameraServer::SwapBuffers()
 {
-    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+    xSemaphoreTakeRecursive(_httpSemaphore, portMAX_DELAY);
     {
         std::swap(_frontRgbBuffer, _backRgbBuffer);
-        httpFrontRgbBuffer = _frontRgbBuffer;
+        _httpFrontRgbBuffer = _frontRgbBuffer;
     }
-    xSemaphoreGiveRecursive(httpSemaphore);
+    xSemaphoreGiveRecursive(_httpSemaphore);
 }
 
 void CameraServer::SetLatestKwh(const KwhInfo& info)
 {
-    xSemaphoreTakeRecursive(httpSemaphore, portMAX_DELAY);
+    xSemaphoreTakeRecursive(_httpSemaphore, portMAX_DELAY);
     {
-        latestKwhInfo = info;
+        _latestKwhInfo = info;
     }
-    xSemaphoreGiveRecursive(httpSemaphore);
+    xSemaphoreGiveRecursive(_httpSemaphore);
+}
+
+esp_err_t CameraServer::HttpGetIndex(httpd_req_t *req)
+{
+    _lastUserInteraction = millis();
+    httpd_resp_send(req, index_html, strlen(index_html));
+    return ESP_OK;
+}
+
+esp_err_t CameraServer::HttpGetLive(httpd_req_t *req)
+{
+    _lastUserInteraction = millis();
+    esp_err_t res = ESP_OK;
+    size_t _jpg_buf_len = 0;
+    uint8_t *_jpg_buf = nullptr;
+    char *part_buf[64];
+
+    res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
+    if (res != ESP_OK)
+    {
+        return res;
+    }
+
+    while (true)
+    {
+        if (_httpFrontRgbBuffer == nullptr)
+        {
+            Serial.println("Camera capture failed");
+            res = ESP_FAIL;
+        }
+        else
+        {
+            xSemaphoreTakeRecursive(_httpSemaphore, portMAX_DELAY);
+            {
+                Serial.println("Compressing RGB to JPEG");
+                static uint32_t imgIdx = 0;
+                imgIdx++;
+
+                ImageUtils::DrawRect(
+                    0, 0, _httpFrontRgbBuffer->w, _httpFrontRgbBuffer->h,
+                    imgIdx % 2 == 0 ? COLOR_RED : COLOR_BLACK, _httpFrontRgbBuffer);
+
+                if (!fmt2jpg(
+                        _httpFrontRgbBuffer->item, 
+                        _httpFrontRgbBuffer->stride * _httpFrontRgbBuffer->h,
+                        _httpFrontRgbBuffer->w,
+                        _httpFrontRgbBuffer->h,
+                        PIXFORMAT_RGB888,
+                        80, &_jpg_buf, &_jpg_buf_len))
+                {
+                    Serial.println("JPEG compression failed");
+                    res = ESP_FAIL;
+                }
+            }
+            xSemaphoreGiveRecursive(_httpSemaphore);
+        }
+
+        if (res == ESP_OK)
+        {
+            size_t hlen = snprintf((char *)part_buf, 64, _STREAM_PART, _jpg_buf_len);
+            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
+        }
+
+        if (res == ESP_OK)
+        {
+            res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+        }
+
+        if (res == ESP_OK)
+        {
+            res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+        }
+
+        if (_jpg_buf)
+        {
+            free(_jpg_buf);
+            _jpg_buf = nullptr;
+        }
+
+        if (res != ESP_OK)
+        {
+            break;
+        }
+
+        //Serial.printf("MJPG: %uB\n", (uint32_t)(_jpg_buf_len));
+    }
+
+    return res;
+}
+
+esp_err_t CameraServer::HttpGetImage(httpd_req_t *req)
+{
+    _lastUserInteraction = millis();
+    esp_err_t res = ESP_OK;
+    size_t _jpg_buf_len = 0;
+    uint8_t *_jpg_buf = nullptr;
+
+    res = httpd_resp_set_type(req, "image/jpeg");
+    if (res != ESP_OK)
+    {
+        return res;
+    }
+
+    if (_httpFrontRgbBuffer == nullptr)
+    {
+        Serial.println("Camera capture failed");
+        httpd_resp_send_500(req);
+        res = ESP_FAIL;
+    }
+    else
+    {
+        xSemaphoreTakeRecursive(_httpSemaphore, portMAX_DELAY);
+        {
+            Serial.println("Compressing RGB to JPEG");
+
+            if (!fmt2jpg(
+                    _httpFrontRgbBuffer->item, 
+                    _httpFrontRgbBuffer->stride * _httpFrontRgbBuffer->h,
+                    _httpFrontRgbBuffer->w,
+                    _httpFrontRgbBuffer->h,
+                    PIXFORMAT_RGB888,
+                    80, &_jpg_buf, &_jpg_buf_len))
+            {
+                Serial.println("JPEG compression failed");
+                res = ESP_FAIL;
+                httpd_resp_send_500(req);
+            }
+        }
+        xSemaphoreGiveRecursive(_httpSemaphore);
+    }
+
+    if (res == ESP_OK)
+    {
+        res = httpd_resp_send(req, (const char *)_jpg_buf, _jpg_buf_len);
+    }
+
+    if (_jpg_buf)
+    {
+        free(_jpg_buf);
+        _jpg_buf = nullptr;
+    }
+
+    return res;
+}
+
+esp_err_t CameraServer::HttpGetKwh(httpd_req_t *req)
+{
+    String str;
+    xSemaphoreTakeRecursive(_httpSemaphore, portMAX_DELAY);
+    {
+        str += _latestKwhInfo.unixtime;
+        str += " ";
+        str += String(_latestKwhInfo.kwh, 1);
+        str += " ";
+        str += _latestKwhInfo.confidence;
+    }
+    xSemaphoreGiveRecursive(_httpSemaphore);
+
+    httpd_resp_send(req, str.c_str(), str.length());
+
+    return ESP_OK;
+}
+
+esp_err_t CameraServer::HttpGetBBoxes(httpd_req_t *req)
+{
+    String str = _settings.GetDigitBBoxesAsJson();
+    httpd_resp_set_type(req, HTTPD_TYPE_JSON);
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_send(req, str.c_str(), str.length());
+    return ESP_OK;
+}
+
+esp_err_t CameraServer::HttpPostBBoxes(httpd_req_t *req)
+{
+    _lastUserInteraction = millis();
+    httpd_resp_set_type(req, HTTPD_TYPE_TEXT);
+
+    std::vector<char> buffer(req->content_len);
+    if (buffer.size() >= req->content_len)
+    {
+        httpd_req_recv(req, buffer.data(), req->content_len);
+        if (_settings.SetDigitBBoxesFromJson(buffer.data()))
+        {
+            _settings.Save();
+            httpd_resp_send(req, "", 0);
+            return ESP_OK;
+        }
+    }
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
+}
+
+bool CameraServer::UserConnected()
+{
+    return millis() - _lastUserInteraction < 300000;
 }

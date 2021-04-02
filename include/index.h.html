@@ -1,0 +1,296 @@
+const char* index_html = R"====(
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MeterCam</title>
+    <style>
+        body {
+            font-family: 'Muli', sans-serif;
+            font-size: 15px;
+            padding: 0px;
+            margin: 0px;
+            background-color: rgb(51, 51, 51);
+            color: rgb(200, 200, 200)
+        }
+
+        input {
+            background-color: rgb(60, 60, 60);
+            color: rgb(200, 200, 200);
+            border: 0px;
+        }
+
+        input[type=button] {
+            padding: 5px 10px;
+            background-color: rgb(69, 69, 69);
+            color: rgb(200, 200, 200)
+        }
+
+        input[type=button]:hover {
+            background-color: rgb(82, 82, 82);
+        }
+
+        input[type=button]:active {
+            background-color: rgb(143, 168, 118);
+        }
+
+        .container {
+            width: 320px;
+            margin-top: 0px;
+            margin-left: auto;
+            margin-bottom: 0px;
+            margin-right: auto;
+            padding: 3px;
+            background-color: rgb(100, 100, 100);
+        }
+
+        .cam-image {
+            position: relative;
+            width: 320px;
+            height: 240px;
+            padding: 0px;
+            margin: 0px;
+            background-color: black;
+        }
+
+        .settings {
+            margin: 0px;
+            padding-top: 1px;
+            border: 0px solid black;
+            background-color: rgb(37, 37, 37);
+        }
+
+        .settings-item {
+            margin-top: 5px;
+            padding: 6px;
+        }
+
+        .digit-item {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .pos-input {
+            width: 40px;
+        }
+
+        .size-input {
+            width: 35px;
+        }
+
+        #digits {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .button-bar {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 5px;
+        }
+
+        .digit-bbox-container {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .digit-bbox {
+            position: absolute;
+            visibility: hidden;
+            left: 0px;
+            top: 0px;
+            width: 30px;
+            height: 42px;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+            border: 1px dashed blue;
+            background-color: rgba(0, 0, 255, 0.3);
+            color: blue;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="cam-image">
+            <img id="cam_img" src="">
+            <ul class="digit-bbox-container" id="bbox_container"></ul>
+        </div>
+        <div class="settings">
+            <ul id="digits"></ul>
+            <div class="settings-item button-bar">
+                <input type="button" value="Reset" onclick="onResetClick()">
+                <input type="button" value="Save" onclick="onApplyClick()">
+            </div>
+        </div>
+    </div>
+    <script>
+        const url_prefix = ".";
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+        function getNumDigits() {
+            for (let i = 0; true; i++) {
+                if ($("digit_bbox" + i) = null)
+                return i + 1;
+            }
+            return 0;
+        }
+
+        function createHtmlElements(i) {
+            if ($("digit_bbox" + i) != null)
+                return;
+
+            const markup = `
+            <span>Digit[${i}]:</span>
+
+            <label for="fname">x</label>
+            <input class="pos-input" type="number" min="0" id="digit_x${i}" oninput="onDigitBBoxEdit(${i})">
+
+            <label for="lname">y</label>
+            <input class="pos-input" type="number" min="0" id="digit_y${i}" oninput="onDigitBBoxEdit(${i})">
+
+            <label for="fname">w</label>
+            <input class="size-input" type="number" min="0" id="digit_w${i}" oninput="onDigitBBoxEdit(${i})">
+
+            <label for="lname">h</label>
+            <input class="size-input" type="number" min="0" id="digit_h${i}" oninput="onDigitBBoxEdit(${i})">
+            `;
+            let li = document.createElement("li");
+            li.className = "settings-item digit-item";
+            li.innerHTML = markup
+            document.getElementById("digits").appendChild(li);
+
+            let bboxli = document.createElement("li");
+            bboxli.id = "digit_bbox" + i;        
+            bboxli.className = "digit-bbox";
+            bboxli.innerHTML = i;
+            document.getElementById("bbox_container").appendChild(bboxli);
+        }
+
+        referehImage();
+        setInterval(function()
+        {
+            referehImage();
+        }, 2000);
+
+        function referehImage() {
+            $("cam_img").src = url_prefix + "/image?" + new Date().getTime();
+        }
+
+        function onResetClick() {
+            loadData();
+        }
+
+        function onApplyClick() {
+            saveData();
+        }
+
+        function getDigitBBox(idx) {
+            
+            if ($('digit_x' + idx) == null)
+                return null;
+
+            let bbox = {
+                x : parseInt($('digit_x' + idx).value),
+                y : parseInt($('digit_y' + idx).value),
+                w : parseInt($('digit_w' + idx).value),
+                h : parseInt($('digit_h' + idx).value),
+            }
+            return bbox;
+        }
+
+        function setDigitBBox(idx, bbox) {
+            createHtmlElements(idx);
+            $('digit_x' + idx).value = bbox.x;
+            $('digit_y' + idx).value = bbox.y;
+            $('digit_w' + idx).value = bbox.w;
+            $('digit_h' + idx).value = bbox.h;
+
+            let s = $('digit_bbox' + idx).style;
+            s.visibility = "visible";
+            s.left = bbox.x + "px";
+            s.top = bbox.y + "px";
+            s.width = bbox.w + "px";
+            s.height = bbox.h + "px";
+        }
+
+        function onDigitBBoxEdit(idx) {
+            let bbox = getDigitBBox(idx);
+            if (bbox != null)
+                setDigitBBox(idx, bbox);            
+        }
+
+        function onDataLoaded(data) {
+            for (let i = 0; i < data.length; i++)
+            {
+                setDigitBBox(i, data[i]);
+            }
+        }
+
+        function loadMockData() {
+            setTimeout(function () {
+                console.log("load mock data");
+                let _x = [ 14, 51, 89,130,169,208,253];
+                let _y = [120,120,120,116,116,116,116];
+                let data = [];
+                for (let i = 0; i < 7; i++)
+                {
+                    let bbox = {
+                        x : _x[i],
+                        y : _y[i],
+                        w : 30,
+                        h : 42,
+                    }
+                    data.push(bbox);
+                }
+                onDataLoaded(data);
+
+            }, 1000);
+        }
+
+        function loadData() {
+            //loadMockData();
+            let xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    let data = JSON.parse(this.responseText);
+                    onDataLoaded(data);
+                }
+            };
+            xmlhttp.open("GET", url_prefix + "/getbboxes", true);
+            xmlhttp.send();
+        }
+
+        function saveData() {
+            let data = [];
+            for (let i = 0; true; i++)
+            {
+                let bbox = getDigitBBox(i);
+                if (bbox == null) break;
+                data.push(bbox);
+            }
+            let xmlhttp = new XMLHttpRequest();
+            xmlhttp.open("POST", url_prefix + "/setbboxes");             
+            xmlhttp.setRequestHeader('Content-type', "application/json");
+            xmlhttp.send(JSON.stringify(data));
+        }
+
+        loadData();
+
+    </script>
+</body>
+
+</html>
+)====";

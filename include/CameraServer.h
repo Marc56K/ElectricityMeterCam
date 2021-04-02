@@ -25,18 +25,30 @@
 #include "esp_camera.h"
 #include "fb_gfx.h"
 #include "fr_forward.h"
+#include <Arduino.h>
+#include "ImageUtils.h"
+#include "esp_http_server.h"
+#include "camera_pins.h"
+#include <sstream>
+#include <functional>
+#include "Settings.h"
 
 struct KwhInfo
 {
     float kwh;
     float confidence;
     unsigned long unixtime;
+
+    KwhInfo() :
+        kwh(0), confidence(0), unixtime(0)
+    {
+    }
 };
 
 class CameraServer
 {
 public:
-    CameraServer();
+    CameraServer(Settings& settings);
     ~CameraServer();
 
     bool StartServer();
@@ -47,9 +59,24 @@ public:
     
     void SetLatestKwh(const KwhInfo& info);
 
+    esp_err_t HttpGetIndex(httpd_req_t *req);
+    esp_err_t HttpGetLive(httpd_req_t *req);
+    esp_err_t HttpGetImage(httpd_req_t *req);
+    esp_err_t HttpGetKwh(httpd_req_t *req);
+    esp_err_t HttpGetBBoxes(httpd_req_t *req);
+    esp_err_t HttpPostBBoxes(httpd_req_t *req);
+
+    bool UserConnected();
+
 private:
+    Settings& _settings;
     dl_matrix3du_t* _frontRgbBuffer;
     dl_matrix3du_t* _backRgbBuffer;
     uint32_t _numCapturedFrames;
     uint32_t _numStoredFrames;
+    httpd_handle_t _httpServer;
+    SemaphoreHandle_t _httpSemaphore;
+    dl_matrix3du_t* _httpFrontRgbBuffer;
+    KwhInfo _latestKwhInfo;
+    unsigned long _lastUserInteraction;
 };

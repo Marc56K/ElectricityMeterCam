@@ -30,9 +30,12 @@
 #include "OCR.h"
 #include "PubSubClient.h"
 #include "wifi_config.h"
+#include "Settings.h"
 
 #define LED_PIN 4
 #define MIN_CONFIDENCE 0.4f
+
+Settings settings;
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
@@ -40,7 +43,7 @@ PubSubClient mqttClient(wifiClient);
 SDCard sdCard;
 //OCR ocr(ocr_model_28x28_tflite, 28, 28, 10);
 OCR ocr(ocr_model_28x28_c11_tflite, 28, 28, 11);
-CameraServer camServer;
+CameraServer camServer(settings);
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600);
@@ -63,24 +66,12 @@ KwhInfo AnalyzeFrame(dl_matrix3du_t* frame, const unsigned long unixtime)
     info.unixtime = unixtime;
     const String time = timeClient.getFormattedTime();
     
-    const int left = 19;
-    const int stepSize = 37;
     float conf = 0;
     int digit = 0;
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < NUM_DIGITS; i++)
     {
-        switch(i){
-        case 0 ... 1:
-            digit = DetectDigit(frame, left + stepSize * i, 112, 30, 42, &conf);
-            break;        
-        case 2 ... 3:
-            digit = DetectDigit(frame, left + (stepSize+2) * i, 111, 30, 42, &conf);        
-            break;
-        case 4 ... 6:
-            digit = DetectDigit(frame, left + (stepSize+1) * i, 108, 30, 42, &conf);
-        default:
-            break;
-        }
+        const DigitBBox bbox = settings.GetDigitBBox(i);
+        digit = DetectDigit(frame, bbox.x, bbox.y, bbox.w, bbox.h, &conf);
         info.confidence = std::min(conf, info.confidence);
         info.kwh += pow(10, 5 - i) * digit;
     }
@@ -96,7 +87,7 @@ KwhInfo AnalyzeFrame(dl_matrix3du_t* frame, const unsigned long unixtime)
 
 void taskDelay(unsigned long milisec)
 {
-    vTaskDelay(milisec * portTICK_PERIOD_MS);
+    vTaskDelay(milisec);
 }
 
 void mqttUpdate()
@@ -148,6 +139,8 @@ void setup()
 
     Serial.begin(115200);
     Serial.println("starting ...");
+
+    settings.Load();
 
     sdCard.Mount();
 
@@ -208,7 +201,10 @@ void loop()
     }
     else
     {
-        taskDelay(60000);
+        for (int i = 0; i < 120 && !camServer.UserConnected(); i++)
+        {
+            taskDelay(500);
+        }
     }    
 
     if (millis() > 24 * 60 * 60 * 1000) // restart esp after 24 hours
