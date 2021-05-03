@@ -8,8 +8,10 @@ JupyterNotebooks/images/digits
 JupyterNotebooks/images/*.jpg
 JupyterNotebooks/images/*.png
 JupyterNotebooks/.ipynb_checkpoints
-JupyterNotebooks/images/captured/*.jpg
-JupyterNotebooks/images/cropped/*.png
+JupyterNotebooks/images/captured
+JupyterNotebooks/images/cropped
 JupyterNotebooks/images/labeled
 *.csv
 *.idx
+JupyterNotebooks/__pycache__
+JupyterNotebooks/.vscode/settings.json

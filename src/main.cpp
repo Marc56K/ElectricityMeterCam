@@ -66,14 +66,16 @@ KwhInfo AnalyzeFrame(dl_matrix3du_t* frame, const unsigned long unixtime)
     info.unixtime = unixtime;
     const String time = timeClient.getFormattedTime();
     
-    float conf = 0;
-    int digit = 0;
     for (int i = 0; i < NUM_DIGITS; i++)
     {
         const DigitBBox bbox = settings.GetDigitBBox(i);
-        digit = DetectDigit(frame, bbox.x, bbox.y, bbox.w, bbox.h, &conf);
-        info.confidence = std::min(conf, info.confidence);
-        info.kwh += pow(10, 5 - i) * digit;
+        if (bbox.w > 0 && bbox.h > 0)
+        {
+            float conf = 0;
+            const int digit = DetectDigit(frame, bbox.x, bbox.y, bbox.w, bbox.h, &conf);
+            info.confidence = std::min(conf, info.confidence);
+            info.kwh += pow(10, 5 - i) * digit;
+        }
     }
 
     uint32_t color = ImageUtils::GetColorFromConfidence(info.confidence, MIN_CONFIDENCE, 1.0f);
