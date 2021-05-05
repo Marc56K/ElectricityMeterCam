@@ -10,7 +10,9 @@ def get_fillcolor(image):
         for i in range(len(a)):
             c.append(int((a[i] + b[i]) / 2))
         return tuple(c)
-        
+
+def img_invert(image):
+    return ImageOps.invert(image)
 
 def img_brightness(image, b):
     img = ImageEnhance.Brightness(image).enhance(b)        

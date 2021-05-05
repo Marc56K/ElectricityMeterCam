@@ -24,6 +24,7 @@
 #include "soc/soc.h"          //disable brownout problems
 #include "soc/rtc_cntl_reg.h" //disable brownout problems
 #include "NTPClient.h"
+#include <analogWrite.h>
 #include "SDCard.h"
 #include "CameraServer.h"
 #include "WifiHelper.h"

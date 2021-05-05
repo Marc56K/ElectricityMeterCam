@@ -18,7 +18,7 @@ class OcrModel:
     cnn = None
     input_width = 28
     input_height = 28
-    output_classes = 10
+    output_classes = 11
     
     def __init__(self):
         self.cnn = Sequential()
@@ -39,10 +39,12 @@ class OcrModel:
     def load_weights(self):
         files = os.listdir("weights")    
         files = [file for file in files if file[-3:] == ".h5"]
-        if len(files) > 0:
-            files.sort(reverse=True)
-            print("loading " + files[0])
-            self.cnn.load_weights("weights/" + files[0])            
+        files.sort(reverse=True)
+        for f in files:
+            if f.find("c" + str(self.output_classes)) != -1:
+                print("loading " + f)
+                self.cnn.load_weights("weights/" + f)
+                break
     
     def save_weights(self, info = None):
         fname = str(int(time.time())) + "_weights_" + str(self.input_width) + "x" + str(self.input_height) + "_c" + str(self.output_classes)

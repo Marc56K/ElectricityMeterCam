@@ -4,9 +4,6 @@
 .vscode/launch.json
 .vscode/ipch
 wifi_config.h
-JupyterNotebooks/images/digits
-JupyterNotebooks/images/*.jpg
-JupyterNotebooks/images/*.png
 JupyterNotebooks/.ipynb_checkpoints
 JupyterNotebooks/images/captured
 JupyterNotebooks/images/cropped
